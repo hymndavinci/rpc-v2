@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allowed IDs - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+
+    <a href="/commands" class="module-back">← Back</a>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>Allowed ID Manager</h1>
+            <p>Manage users authorized to use bot commands.</p>
+        </div>
+
+        <div class="section-card">
+            <div class="section-title">
+                <i class="fas fa-user-plus"></i> Add User
+            </div>
+            <p style="color:#888; font-size:0.9rem; margin-bottom:15px;">Paste a User ID to grant access. The bot must
+                be able to fetch the user (share a server/DM).</p>
+
+            <input type="text" id="inputUser" class="input-field" placeholder="Paste Discord User ID..."
+                oninput="onInput()">
+            <div id="previewUser" style="display:none;"></div>
+            <button id="btnAdd" class="btn-add" disabled onclick="confirmAdd()">Add User Access</button>
+        </div>
+
+        <div class="section-card">
+            <div class="section-title">
+                <i class="fas fa-users-cog"></i> Authorized Users
+            </div>
+            <div id="userList">
+                <div class="no-items">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+
+        </div>
+    </main>
+
+
+        <script>
+            let debounceTimer;
+            let currentUserId = '';
+
+            async function loadList() {
+                try {
+                    const res = await fetch('/api/allowed');
+                    const data = await res.json();
+                    renderList(data.allowedUsers);
+                } catch (e) { console.error(e); }
+            }
+
+            function renderList(users) {
+                const list = document.getElementById('userList');
+                if (!users || users.length === 0) {
+                    list.innerHTML = '<div class="no-items">No allowed users configured. Only local bot owner might have access depending on hardcoded settings.</div>';
+                    return;
+                }
+
+                let html = '';
+                users.forEach(u => {
+                    const safeAvatar = typeof safeHttpsUrl === 'function' ? safeHttpsUrl(u.avatar) : escapeHtml(String(u.avatar || ''));
+                    const safeName = escapeHtml(String(u.username != null ? u.username : ''));
+                    const safeId = escapeHtml(String(u.id != null ? u.id : ''));
+                    html += `
+                    <div class="whitelist-item">
+                        <img src="${safeAvatar}" class="whitelist-icon">
+                        <div class="whitelist-info">
+                            <div class="whitelist-name">${safeName}</div>
+                            <div class="whitelist-sub">${safeId}</div>
+                        </div>
+                        <button class="btn-delete" onclick="removeUser('${safeId}')"><i class="fas fa-trash"></i> Remove</button>
+                    </div>
+                `;
+                });
+                list.innerHTML = html;
+            }
+
+            function onInput() {
+                clearTimeout(debounceTimer);
+                const id = document.getElementById('inputUser').value.trim();
+                const preview = document.getElementById('previewUser');
+                const btn = document.getElementById('btnAdd');
+
+                if (id.length < 17) {
+                    preview.style.display = 'none';
+                    btn.disabled = true;
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    preview.style.display = 'block';
+                    preview.innerHTML = '<div style="color:#aaa;">Fetching user details...</div>';
+
+                    try {
+                        const res = await fetch('/api/validate/user', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id })
+                        });
+
+                        if (res.ok) {
+                            const user = await res.json();
+                            currentUserId = user.id;
+                            const safeAv = typeof safeHttpsUrl === 'function' ? safeHttpsUrl(user.avatar) : escapeHtml(String(user.avatar || ''));
+                            const safeNm = escapeHtml(String(user.username != null ? user.username : ''));
+                            const safeUid = escapeHtml(String(user.id != null ? user.id : ''));
+                            preview.innerHTML = `
+                            <div class="server-preview">
+                                <img src="${safeAv}" class="whitelist-icon">
+                                <div class="whitelist-info">
+                                    <div class="whitelist-name">${safeNm}</div>
+                                    <div class="whitelist-sub">ID: ${safeUid}</div>
+                                </div>
+                            </div>
+                        `;
+                            btn.disabled = false;
+                        } else {
+                            preview.innerHTML = '<div style="color:#e74c3c; padding:10px;">User not found or invalid ID.</div>';
+                            btn.disabled = true;
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        preview.innerHTML = '<div style="color:#e74c3c;">Error fetching user.</div>';
+                    }
+                }, 800);
+            }
+
+            async function confirmAdd() {
+                const btn = document.getElementById('btnAdd');
+                btn.disabled = true;
+                btn.innerText = "Adding...";
+
+                try {
+                    await fetch('/api/allowed', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'add', id: currentUserId })
+                    });
+
+                    document.getElementById('inputUser').value = '';
+                    document.getElementById('previewUser').style.display = 'none';
+                    btn.innerText = "Add User Access";
+
+                    await loadList();
+                } catch (e) { showToast('Error adding user', 'error'); }
+            }
+
+            async function removeUser(id) {
+                if (!confirm('Revoke access for this user?')) return;
+                try {
+                    await fetch('/api/allowed', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'remove', id })
+                    });
+                    await loadList();
+                } catch (e) { showToast('Error removing user', 'error'); }
+            }
+
+            window.onload = loadList;
+        </script>
+</body>
+
+</html>

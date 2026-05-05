@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Reaction - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+    <a href="/commands" class="module-back">← Back</a>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>Auto Reaction</h1>
+            <p>Manage automatic reactions remotely.</p>
+        </div>
+
+        <!-- Global Toggle -->
+        <div class="section-card">
+            <div class="status-row">
+                <div class="status-info"> <!-- Wrapped in flex container -->
+                    <span style="font-size: 1.1rem; font-weight:600;">Global Enable</span>
+                    <p style="color: #888; font-size: 0.85rem; margin-top: 5px;">
+                        <span id="globalStatusText">ON: Reaction works everywhere.</span>
+                    </p>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="globalToggle" onchange="updateConfig()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Whitelists -->
+        <div class="form-grid">
+            <div class="section-card">
+                <div class="section-title">Whitelisted Servers</div>
+                <p style="color:#888; font-size:0.85rem; margin-bottom:15px;">Enable even if Global is OFF.</p>
+
+                <input type="text" id="inputGuild" class="input-field" placeholder="Paste Server ID..."
+                    oninput="onWhitelistInput('guild')">
+                <div id="previewGuild" style="display:none;"></div>
+                <button id="btnAddGuild" class="btn-add" disabled onclick="confirmAdd('guild')">Add Server</button>
+
+                <div id="serverList"
+                    style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;"></div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-title">Whitelisted Channels</div>
+                <p style="color:#888; font-size:0.85rem; margin-bottom:15px;">Enable even if Global is OFF.</p>
+
+                <input type="text" id="inputChannel" class="input-field" placeholder="Paste Channel ID..."
+                    oninput="onWhitelistInput('channel')">
+                <div id="previewChannel" style="display:none;"></div>
+                <button id="btnAddChannel" class="btn-add" disabled onclick="confirmAdd('channel')">Add Channel</button>
+
+                <div id="channelList"
+                    style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;"></div>
+            </div>
+        </div>
+
+        <!-- Add New Trigger -->
+        <div class="section-card">
+            <div class="section-title">Add New Trigger</div>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label class="input-label">Type</label>
+                    <select id="newType" class="input-field">
+                        <option value="text">Text / Keyword</option>
+                        <option value="user">User ID</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Trigger</label>
+                    <input type="text" id="newTrigger" class="input-field" placeholder="Keyword or User ID...">
+                </div>
+                <div class="input-group full-width">
+                    <label class="input-label">Emojis</label>
+                    <input type="text" id="newEmojis" class="input-field" placeholder="e.g. 🔥 💯 <a:dance:123456>">
+                </div>
+            </div>
+            <button class="btn-add" onclick="addTrigger()">Add Trigger</button>
+        </div>
+
+        <!-- Trigger Lists -->
+        <div class="form-grid">
+            <div class="section-card">
+                <div class="section-title">Text Triggers</div>
+                <div id="textList">
+                    <div class="no-items">Loading...</div>
+                </div>
+            </div>
+            <div class="section-card">
+                <div class="section-title">User Triggers</div>
+                <div id="userList">
+                    <div class="no-items">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        </div>
+    </main>
+
+        <script>
+            let currentData = {};
+            let debounceTimer;
+
+            async function loadData() {
+                try {
+                    const res = await fetch('/api/reaction');
+                    currentData = await res.json();
+                    render();
+                } catch (e) { console.error(e); }
+            }
+
+            function render() {
+                // Global
+                const globalOn = currentData.global;
+                document.getElementById('globalToggle').checked = globalOn;
+                document.getElementById('globalStatusText').innerText = globalOn ?
+                    "ON: Reactions active everywhere." :
+                    "OFF: Reactions active ONLY in Whitelisted Servers/Channels.";
+
+                // Text List
+                const textList = document.getElementById('textList');
+                textList.innerHTML = '';
+                const texts = Object.entries(currentData.textTriggers || {});
+                if (texts.length === 0) textList.innerHTML = '<div class="no-items">No text triggers set.</div>';
+                else {
+                    texts.forEach(function ([trigger, emojis]) {
+                        var emLine = Array.isArray(emojis)
+                            ? emojis.map(e => escapeHtml(String(e))).join(' ')
+                            : '';
+                        textList.innerHTML +=
+                            '<div class="trigger-item"><div class="trigger-info">' +
+                            '<div class="trigger-name">"' +
+                            escapeHtml(String(trigger)) +
+                            '"</div>' +
+                            '<div class="trigger-emojis">' +
+                            emLine +
+                            '</div></div>' +
+                            '<button type="button" class="btn-delete" onclick="deleteTrigger(' +
+                            JSON.stringify('text') +
+                            ', ' +
+                            JSON.stringify(trigger) +
+                            ')"><i class="fas fa-trash"></i></button></div>';
+                    });
+                }
+
+                // User List
+                const userList = document.getElementById('userList');
+                userList.innerHTML = '';
+                const users = Object.entries(currentData.userTriggers || {});
+                if (users.length === 0) userList.innerHTML = '<div class="no-items">No user triggers set.</div>';
+                else {
+                    users.forEach(function ([userId, emojis]) {
+                        var emLine = Array.isArray(emojis)
+                            ? emojis.map(e => escapeHtml(String(e))).join(' ')
+                            : '';
+                        userList.innerHTML +=
+                            '<div class="trigger-item"><div class="trigger-info">' +
+                            '<div class="trigger-name">User: ' +
+                            escapeHtml(String(userId)) +
+                            '</div>' +
+                            '<div class="trigger-emojis">' +
+                            emLine +
+                            '</div></div>' +
+                            '<button type="button" class="btn-delete" onclick="deleteTrigger(' +
+                            JSON.stringify('user') +
+                            ', ' +
+                            JSON.stringify(userId) +
+                            ')"><i class="fas fa-trash"></i></button></div>';
+                    });
+                }
+
+                // Render SERVER Whitelist (using enriched data)
+                const sList = document.getElementById('serverList');
+                sList.innerHTML = '';
+                const servers = currentData.enrichedServers || [];
+                if (servers.length === 0) sList.innerHTML = '<div class="no-items">No whitelisted servers.</div>';
+                else {
+                    servers.forEach(function (s) {
+                        var ic = safeHttpsUrl(s.icon);
+                        sList.innerHTML +=
+                            '<div class="whitelist-item">' +
+                            '<img class="whitelist-icon wf-ico" src="" alt="">' +
+                            '<div class="whitelist-info">' +
+                            '<div class="whitelist-name">' +
+                            escapeHtml(String(s.name != null ? s.name : '')) +
+                            '</div><div class="whitelist-sub">ID: ' +
+                            escapeHtml(String(s.id != null ? s.id : '')) +
+                            '</div></div>' +
+                            '<button type="button" class="btn-delete" style="padding:5px 10px;" onclick="removeWhitelist(' +
+                            JSON.stringify('guild') +
+                            ', ' +
+                            JSON.stringify(String(s.id)) +
+                            ')"><i class="fas fa-times"></i></button></div>';
+                        var wf = sList.querySelector('.whitelist-item:last-child .wf-ico');
+                        if (wf) wf.src = ic;
+                    });
+                }
+
+                // Render CHANNEL Whitelist (using enriched data)
+                const cList = document.getElementById('channelList');
+                cList.innerHTML = '';
+                const channels = currentData.enrichedChannels || [];
+                if (channels.length === 0) cList.innerHTML = '<div class="no-items">No whitelisted channels.</div>';
+                else {
+                    channels.forEach(function (c) {
+                        var ic = safeHttpsUrl(c.guildIcon);
+                        cList.innerHTML +=
+                            '<div class="whitelist-item">' +
+                            '<img class="whitelist-icon wf-ico" src="" alt="">' +
+                            '<div class="whitelist-info">' +
+                            '<div class="whitelist-name">#' +
+                            escapeHtml(String(c.name != null ? c.name : '')) +
+                            '</div><div class="whitelist-sub">in ' +
+                            escapeHtml(String(c.guildName != null ? c.guildName : '')) +
+                            '</div></div>' +
+                            '<button type="button" class="btn-delete" style="padding:5px 10px;" onclick="removeWhitelist(' +
+                            JSON.stringify('channel') +
+                            ', ' +
+                            JSON.stringify(String(c.id)) +
+                            ')"><i class="fas fa-times"></i></button></div>';
+                        var wf = cList.querySelector('.whitelist-item:last-child .wf-ico');
+                        if (wf) wf.src = ic;
+                    });
+                }
+            }
+
+            function onWhitelistInput(type) {
+                clearTimeout(debounceTimer);
+                const inputId = type === 'guild' ? 'inputGuild' : 'inputChannel';
+                const previewId = type === 'guild' ? 'previewGuild' : 'previewChannel';
+                const btnId = type === 'guild' ? 'btnAddGuild' : 'btnAddChannel';
+                const id = document.getElementById(inputId).value.trim();
+                const previewEl = document.getElementById(previewId);
+                const btnEl = document.getElementById(btnId);
+
+                if (id.length < 17) {
+                    previewEl.style.display = 'none';
+                    btnEl.disabled = true;
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    previewEl.style.display = 'block';
+                    previewEl.className = 'server-preview';
+                    previewEl.innerHTML = '<div style="color:#999;">Verifying...</div>';
+
+                    try {
+                        const res = await fetch(`/api/validate/${type}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id })
+                        });
+
+                        if (res.ok) {
+                            const info = await res.json();
+                            let rawIcon = info.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+                            if (type === 'channel') {
+                                rawIcon =
+                                    info.guildIcon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+                            }
+
+                            let iconUrl = safeHttpsUrl(rawIcon);
+
+                            let subInfo =
+                                type === 'guild'
+                                    ? 'Server Found'
+                                    : 'In server: ' +
+                                      escapeHtml(
+                                          String(info.guildName != null ? info.guildName : '')
+                                      );
+
+                            previewEl.innerHTML =
+                                '<div class="server-preview-wrapper">' +
+                                '<img class="sp-icon wf-ico" src="" alt="">' +
+                                '<div class="sp-info">' +
+                                '<div class="sp-name">' +
+                                escapeHtml(String(info.name != null ? info.name : '')) +
+                                '</div><div class="sp-sub">' +
+                                subInfo +
+                                '</div></div></div>';
+                            var piv = previewEl.querySelector('.wf-ico');
+                            if (piv) piv.src = iconUrl;
+                            btnEl.disabled = false;
+                        } else {
+                            previewEl.innerHTML = '<div style="color:#ff5555;">Invalid ID or Bot not in server.</div>';
+                            btnEl.disabled = true;
+                        }
+                    } catch (e) {
+                        previewEl.innerHTML = '<div style="color:#ff5555;">Error checking ID.</div>';
+                        btnEl.disabled = true;
+                    }
+                }, 800);
+            }
+
+            async function confirmAdd(type) {
+                const inputId = type === 'guild' ? 'inputGuild' : 'inputChannel';
+                const id = document.getElementById(inputId).value.trim();
+                if (!id) return;
+
+                if (type === 'guild') {
+                    if (!currentData.enabledServers) currentData.enabledServers = [];
+                    if (!currentData.enabledServers.includes(id)) currentData.enabledServers.push(id);
+                } else {
+                    if (!currentData.enabledChannels) currentData.enabledChannels = [];
+                    if (!currentData.enabledChannels.includes(id)) currentData.enabledChannels.push(id);
+                }
+                await saveData();
+                await loadData();
+
+                document.getElementById(inputId).value = '';
+                document.getElementById(type === 'guild' ? 'previewGuild' : 'previewChannel').style.display = 'none';
+                document.getElementById(type === 'guild' ? 'btnAddGuild' : 'btnAddChannel').disabled = true;
+            }
+
+            async function removeWhitelist(type, id) {
+                if (!confirm('Remove this whitelist entry?')) return;
+                if (type === 'guild') {
+                    currentData.enabledServers = currentData.enabledServers.filter(x => x !== id);
+                } else {
+                    currentData.enabledChannels = currentData.enabledChannels.filter(x => x !== id);
+                }
+                await saveData();
+                await loadData();
+            }
+
+            async function updateConfig() {
+                currentData.global = document.getElementById('globalToggle').checked;
+                await saveData();
+                render();
+            }
+
+            async function addTrigger() {
+                const type = document.getElementById('newType').value;
+                const trigger = document.getElementById('newTrigger').value.trim();
+                const emojiStr = document.getElementById('newEmojis').value.trim();
+
+                if (!trigger || !emojiStr) return showToast('Please fill in all fields', 'warn');
+                const emojis = emojiStr.split(/\s+/).filter(e => e);
+
+                if (type === 'text') {
+                    if (!currentData.textTriggers) currentData.textTriggers = {};
+                    currentData.textTriggers[trigger] = emojis;
+                } else {
+                    if (!currentData.userTriggers) currentData.userTriggers = {};
+                    currentData.userTriggers[trigger] = emojis;
+                }
+
+                await saveData();
+                document.getElementById('newTrigger').value = '';
+                document.getElementById('newEmojis').value = '';
+                render();
+            }
+
+            async function deleteTrigger(type, trigger) {
+                if (!confirm('Delete this trigger?')) return;
+                if (type === 'text') delete currentData.textTriggers[trigger];
+                else delete currentData.userTriggers[trigger];
+                await saveData();
+                render();
+            }
+
+            async function saveData() {
+                try {
+                    const payload = {
+                        global: currentData.global,
+                        enabledServers: currentData.enabledServers,
+                        enabledChannels: currentData.enabledChannels,
+                        textTriggers: currentData.textTriggers,
+                        userTriggers: currentData.userTriggers
+                    };
+                    await fetch('/api/reaction', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (e) { console.error('Error saving:', e); }
+            }
+
+            window.onload = loadData;
+        </script>
+</body>
+
+</html>

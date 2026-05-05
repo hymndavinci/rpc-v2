@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hymn+ AFK System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+    <header class="page-header">
+        <div>
+            <p class="page-header__eyebrow">System</p>
+            <h1 class="page-header__title">AFK</h1>
+            <p class="page-header__hint">Auto-reply when mentioned while away.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+            <% if (afkData.isOn) { %>
+                <span class="badge online">ENABLED</span>
+            <% } else { %>
+                <span class="badge dnd">DISABLED</span>
+            <% } %>
+            <form action="/afk/save" method="POST" id="afkForm">
+                <input type="hidden" name="logsEnabled" value="<%= afkData.logsEnabled ? 'on' : 'off' %>">
+                <input type="hidden" name="reason" value="<%= afkData.reason %>">
+                <label class="toggle-switch" style="margin:0;">
+                    <input type="hidden" name="isOn" value="off">
+                    <input type="checkbox" name="isOn" value="on" <%= afkData.isOn ? 'checked' : '' %> onchange="document.getElementById('afkForm').submit()">
+                    <span class="slider"></span>
+                </label>
+            </form>
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+
+        <form action="/afk/save" method="POST" class="settings-form settings-form--spaced" id="reasonForm">
+            <input type="hidden" name="isOn" value="<%= afkData.isOn ? 'on' : 'off' %>">
+            <input type="hidden" name="logsEnabled" value="<%= afkData.logsEnabled ? 'on' : 'off' %>">
+            <div class="form-group">
+                <label>AFK Reason (Auto-Reply)</label>
+                <input type="text" name="reason" class="input-field" value="<%= afkData.reason %>"
+                    placeholder="Check my logs!">
+            </div>
+            <button type="submit" class="save-btn">Save Reason</button>
+        </form>
+
+        <div class="logs-section">
+            <div class="logs-header">
+                <div class="logs-header__left">
+                    <div class="title">Recent Mentions</div>
+                    <form action="/afk/save" method="POST" id="logsForm">
+                        <input type="hidden" name="isOn" value="<%= afkData.isOn ? 'on' : 'off' %>">
+                        <input type="hidden" name="reason" value="<%= afkData.reason %>">
+                        <label class="toggle-switch toggle-switch--sm" title="Toggle Logs">
+                            <input type="hidden" name="logsEnabled" value="off">
+                            <input type="checkbox" name="logsEnabled" value="on" <%= afkData.logsEnabled ? 'checked' : '' %> onchange="document.getElementById('logsForm').submit()">
+                            <span class="slider"></span>
+                        </label>
+                    </form>
+                </div>
+                <form action="/afk/clear-logs" method="POST" class="form-inline">
+                    <input type="hidden" name="clearAll" value="true">
+                    <button type="submit" class="clear-btn">Clear All Logs</button>
+                </form>
+            </div>
+
+            <div class="logs-list">
+                <% if (logs && logs.length > 0) { %>
+                    <% logs.forEach(log => { %>
+                        <div class="log-item">
+                            <div class="log-info">
+                                <span class="log-user"><%= log.user %></span>
+                                <span class="log-msg">"<%= log.content %>"</span>
+                            </div>
+                            <div class="log-meta">
+                                <div><%= log.time %></div>
+                                <div><%= log.guild %> #<%= log.channel %></div>
+                                <a href="<%= log.link %>" target="_blank" class="log-link">Click Here</a>
+                                <form action="/afk/clear-logs" method="POST" class="form-inline">
+                                    <input type="hidden" name="logId" value="<%= log.id %>">
+                                    <button type="submit" class="delete-log-btn">✕</button>
+                                </form>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <div class="empty-msg">No logs found yet...</div>
+                <% } %>
+            </div>
+        </div>
+
+    </div>
+
+        </div>
+    </main>
+
+    <script>
+        const reasonForm = document.getElementById('reasonForm');
+        if (reasonForm) {
+            reasonForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new URLSearchParams(new FormData(reasonForm));
+                const btn = reasonForm.querySelector('.save-btn');
+                const originalText = btn.innerText;
+                btn.innerText = "Saving...";
+                try {
+                    const res = await fetch('/afk/save', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        btn.innerText = "Saved!";
+                        btn.style.background = "var(--status-online)";
+                        btn.style.boxShadow = "0 0 15px var(--status-online)";
+                        setTimeout(() => {
+                            btn.innerText = originalText;
+                            btn.style.background = "";
+                            btn.style.boxShadow = "";
+                        }, 2000);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    btn.innerText = "Error";
+                    setTimeout(() => btn.innerText = originalText, 2000);
+                }
+            });
+        }
+
+        async function fetchLogs() {
+            try {
+                const res = await fetch('/api/logs');
+                const logs = await res.json();
+                renderLogs(logs);
+            } catch (err) { console.error(err); }
+        }
+
+        function renderLogs(logs) {
+            const container = document.querySelector('.logs-list');
+            if (!container) return;
+            const currentFirstId = container.querySelector('input[name="logId"]')?.value;
+            const newFirstId = logs[0]?.id;
+            const isEmptyShowing = container.querySelector('.empty-msg');
+            if (logs.length > 0 && currentFirstId === newFirstId && !isEmptyShowing) return;
+            if (logs.length === 0 && isEmptyShowing) return;
+            let html = '';
+            if (logs.length === 0) {
+                html = '<div class="empty-msg">No logs found yet...</div>';
+            } else {
+                logs.forEach(function (log) {
+                    var linkHref =
+                        typeof safeHttpsUrl === 'function'
+                            ? safeHttpsUrl(String(log.link || ''), '#')
+                            : '#';
+                    html +=
+                        '<div class="log-item">' +
+                        '<div class="log-info">' +
+                        '<span class="log-user">' +
+                        escapeHtml(String(log.user != null ? log.user : '')) +
+                        '</span>' +
+                        '<span class="log-msg">"' +
+                        escapeHtml(String(log.content != null ? log.content : '')) +
+                        '"</span></div>' +
+                        '<div class="log-meta">' +
+                        '<div>' +
+                        escapeHtml(String(log.time != null ? log.time : '')) +
+                        '</div><div>' +
+                        escapeHtml(String(log.guild != null ? log.guild : '')) +
+                        ' #' +
+                        escapeHtml(String(log.channel != null ? log.channel : '')) +
+                        '</div>' +
+                        '<a href="' +
+                        linkHref.replace(/"/g, '&quot;') +
+                        '" target="_blank" rel="noopener noreferrer" class="log-link">Click Here</a>' +
+                        '<form action="/afk/clear-logs" method="POST" class="form-inline">' +
+                        '<input type="hidden" name="logId" value="' +
+                        escapeHtml(String(log.id != null ? log.id : '')) +
+                        '">' +
+                        '<button type="submit" class="delete-log-btn">✕</button></form></div></div>';
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        var afkLogPollId = null;
+        function scheduleAfkLogPoll() {
+            if (afkLogPollId) clearInterval(afkLogPollId);
+            afkLogPollId = null;
+            if (document.hidden) return;
+            afkLogPollId = setInterval(fetchLogs, 2000);
+        }
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) fetchLogs();
+            scheduleAfkLogPoll();
+        });
+        fetchLogs();
+        scheduleAfkLogPoll();
+    </script>
+</body>
+
+</html>

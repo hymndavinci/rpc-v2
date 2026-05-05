@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirror System - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+
+    <a href="/commands" class="module-back">← Back</a>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>Mirror System</h1>
+            <p>Duplicate messages between channels instantly.</p>
+        </div>
+
+        <!-- Configuration -->
+        <div class="section-card">
+            <div class="section-title">New Mirror</div>
+
+            <div class="input-group">
+                <label class="input-label">Mirror Mode</label>
+                <select id="mode" class="input-field" onchange="onModeChange()">
+                    <option value="normal">Normal Mode (Copy Content Only)</option>
+                    <option value="webhook">Clone Mode (Webhook - Identity Clone)</option>
+                </select>
+                <p id="modeDesc" class="mode-desc">
+                    Normal: Reposts messages as your account (SelfBot).<br>
+                    Clone: Creates a Webhook to mimic the original sender (Name/Avatar). <strong>Requires 'Manage
+                        Webhooks' permission in Target.</strong>
+                </p>
+            </div>
+
+            <div class="form-grid">
+                <!-- Source -->
+                <div>
+                    <label class="input-label">Source Channel ID</label>
+                    <input type="text" id="sourceId" class="input-field" placeholder="Channel to copy FROM..."
+                        oninput="validateChannel('source')">
+                    <div id="previewSource" class="server-preview hidden"></div>
+                </div>
+
+                <!-- Target -->
+                <div>
+                    <label class="input-label">Target Channel ID</label>
+                    <input type="text" id="targetId" class="input-field" placeholder="Channel to copy TO..."
+                        oninput="validateChannel('target')">
+                    <div id="previewTarget" class="server-preview hidden"></div>
+                </div>
+            </div>
+
+            <button id="btnAdd" class="btn-add" disabled onclick="addMirror()">Start Mirroring</button>
+        </div>
+
+        <!-- Active Mirrors -->
+        <div class="section-card">
+            <div class="section-title">Active Mirrors</div>
+            <div id="mirrorList">
+                <div class="mirror-loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+
+        </div>
+    </main>
+
+
+        <script>
+            let validSource = false;
+            let validTarget = false;
+            let debounceTimer;
+
+            (function mirrorListDelegation() {
+                var root = document.getElementById('mirrorList');
+                if (!root) return;
+                root.addEventListener('click', function (ev) {
+                    var btn = ev.target.closest('[data-stop-mirror]');
+                    if (!btn || !root.contains(btn)) return;
+                    stopMirror(btn.getAttribute('data-stop-mirror'));
+                });
+            })();
+
+            function onModeChange() {
+                // Re-validate target if ID exists, because permission requirements changed
+                const tid = document.getElementById('targetId').value.trim();
+                if (tid) validateChannel('target');
+            }
+
+            function validateChannel(type) {
+                clearTimeout(debounceTimer);
+                const id = document.getElementById(type + 'Id').value.trim();
+                const preview = document.getElementById('preview' + (type === 'source' ? 'Source' : 'Target'));
+                const checkWebhook = type === 'target' && document.getElementById('mode').value === 'webhook';
+
+                if (type === 'source') validSource = false; else validTarget = false;
+                checkBtn();
+
+                if (id.length < 17) {
+                    preview.style.display = 'none';
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    preview.style.display = 'block';
+                    preview.innerHTML = '<div style="color:#999;">Verifying...</div>';
+
+                    try {
+                        const res = await fetch('/api/validate/mirror-channel', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id, checkWebhook, type })
+                        });
+
+                        if (res.ok) {
+                            const info = await res.json();
+                            var ic = typeof safeHttpsUrl === 'function'
+                                ? safeHttpsUrl(info.icon)
+                                : (info.icon || 'https://cdn.discordapp.com/embed/avatars/0.png');
+                            var nm = escapeHtml(String(info.name != null ? info.name : ''));
+                            var gn = escapeHtml(String(info.guildName != null ? info.guildName : ''));
+                            preview.innerHTML =
+                                '<div class="channel-preview">' +
+                                '<img class="cp-icon" src="" alt="">' +
+                                '<div class="cp-info">' +
+                                '<div class="cp-name">#' +
+                                nm +
+                                '</div><div class="cp-sub">' +
+                                gn +
+                                '</div></div></div>';
+                            var imgPrev = preview.querySelector('.cp-icon');
+                            if (imgPrev) imgPrev.src = ic;
+
+                            if (type === 'source') validSource = true; else validTarget = true;
+                        } else {
+                            const err = await res.json();
+                            var eh = escapeHtml(String(err.error != null ? err.error : ''));
+                            preview.innerHTML =
+                                '<div style="color:#e74c3c; padding:10px;">Error: ' +
+                                eh +
+                                '</div>';
+                        }
+                    } catch (e) {
+                        preview.innerHTML = `<div style="color:#e74c3c; padding:10px;">Validation Failed</div>`;
+                    }
+                    checkBtn();
+                }, 600);
+            }
+
+            function checkBtn() {
+                document.getElementById('btnAdd').disabled = !(validSource && validTarget);
+            }
+
+            async function addMirror() {
+                const sourceId = document.getElementById('sourceId').value.trim();
+                const targetId = document.getElementById('targetId').value.trim();
+                const mode = document.getElementById('mode').value;
+                const btn = document.getElementById('btnAdd');
+
+                btn.disabled = true;
+                btn.innerText = "Starting...";
+
+                try {
+                    const res = await fetch('/api/mirror', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sourceId, targetId, mode })
+                    });
+
+                    if (res.ok) {
+                        // Reset UI
+                        document.getElementById('sourceId').value = '';
+                        document.getElementById('targetId').value = '';
+                        document.getElementById('previewSource').style.display = 'none';
+                        document.getElementById('previewTarget').style.display = 'none';
+                        validSource = false; validTarget = false;
+
+                        loadMirrors();
+                    } else {
+                        const err = await res.json();
+                        showToast("Error: " + err.error, "error");
+                    }
+                } catch (e) { showToast("Failed to start mirror.", "error"); }
+
+                btn.innerText = "Start Mirroring";
+                checkBtn(); // Recalculate disable state
+            }
+
+            async function stopMirror(sourceId) {
+                if (!confirm('Stop this mirror?')) return;
+                try {
+                    await fetch('/api/mirror', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sourceId })
+                    });
+                    loadMirrors();
+                } catch (e) { console.error(e); }
+            }
+
+            async function loadMirrors() {
+                const listEl = document.getElementById('mirrorList');
+                try {
+                    const res = await fetch('/api/mirror');
+                    const mirrors = await res.json();
+
+                    if (mirrors.length === 0) {
+                        listEl.innerHTML = '<div style="text-align:center; color:#666; font-style:italic;">No active mirrors.</div>';
+                        return;
+                    }
+
+                    listEl.innerHTML = '';
+                    mirrors.forEach(function (m) {
+                        var sid = String(m.sourceId != null ? m.sourceId : '').trim();
+                        if (!/^[0-9]{10,}$/.test(sid)) return;
+                        var modeClass =
+                            m.mode === 'webhook' ? 'tag tag-webhook' : 'tag tag-normal';
+                        var modeLabel = m.mode === 'webhook' ? 'Clone' : 'Normal';
+                        var sIcon = safeHttpsUrl(m.sourceIcon);
+                        var tIcon = safeHttpsUrl(m.targetIcon);
+                        var row = document.createElement('div');
+                        row.className = 'whitelist-item';
+                        row.innerHTML =
+                            '<div style="flex:1;"><div style="font-weight:bold; margin-bottom:5px;"><span class="' +
+                            modeClass +
+                            '">' +
+                            modeLabel +
+                            '</span></div>' +
+                            '<div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">' +
+                            '<img class="m-src-i" alt="" style="width:20px;height:20px;border-radius:50%;">' +
+                            '<span class="m-src-n"></span>' +
+                            '<i class="fas fa-arrow-right" style="color:#666;font-size:0.8rem;"></i>' +
+                            '<img class="m-tgt-i" alt="" style="width:20px;height:20px;border-radius:50%;">' +
+                            '<span class="m-tgt-n"></span>' +
+                            '</div></div>' +
+                            '<button type="button" class="btn-delete" data-stop-mirror="">Stop</button>';
+                        var ns = row.querySelector('.m-src-n');
+                        var nt = row.querySelector('.m-tgt-n');
+                        if (ns) ns.textContent = String(m.sourceName != null ? m.sourceName : '');
+                        if (nt) nt.textContent = String(m.targetName != null ? m.targetName : '');
+                        var isrc = row.querySelector('.m-src-i');
+                        var itsrc = row.querySelector('.m-tgt-i');
+                        if (isrc) isrc.src = sIcon;
+                        if (itsrc) itsrc.src = tIcon;
+                        var stopBtn = row.querySelector('[data-stop-mirror]');
+                        if (stopBtn) stopBtn.setAttribute('data-stop-mirror', sid);
+                        listEl.appendChild(row);
+                    });
+
+                } catch (e) {
+                    listEl.innerHTML = '<div style="color:#e74c3c;">Failed to load mirrors.</div>';
+                }
+            }
+
+            window.onload = loadMirrors;
+        </script>
+</body>
+
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hymn+ Music</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/music.css">
+  <link rel="icon" href="/favicon.ico">
+</head>
+
+<body class="app-shell music-shell">
+  <%- include('partials/super_button') %>
+
+  <main class="main">
+    <div class="main__inner music-wrap">
+      <header class="page-header">
+        <div>
+          <p class="page-header__eyebrow">MUSIC PLAYER</p>
+          <h1 class="page-header__title">Voice Deck</h1>
+        </div>
+        <div class="page-chip">QUEUE LIVE</div>
+      </header>
+
+      <div class="music-bg">
+        <img id="bgImg" class="music-bg-img" src="" alt="">
+      </div>
+
+      <div class="music-page">
+        <div id="joinUI" class="state-card hidden">
+          <div class="state-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </div>
+          <div class="state-title">Join a Channel</div>
+          <div class="state-desc">Select a server and voice channel to start listening.</div>
+          <select id="serverSelect" class="select-styled" onchange="loadChannels()">
+            <option value="">Select Server</option>
+          </select>
+          <select id="channelSelect" class="select-styled">
+            <option value="">Select Voice Channel</option>
+          </select>
+          <button type="button" class="btn-primary" onclick="joinChannel()">Join Voice</button>
+          <p id="joinFeedback" class="join-feedback" aria-live="polite"></p>
+        </div>
+
+        <div id="idleUI" class="state-card hidden">
+          <div class="guild-badge">
+            <img id="idleGuildIcon" src="" class="guild-icon" alt="">
+            <div class="guild-info">
+              <span id="idleGuildName">Guild</span> • <span id="idleChannelName" class="channel-name">#Channel</span>
+            </div>
+          </div>
+          <div class="state-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+          </div>
+          <div class="state-title">Ready to Play</div>
+          <div class="state-desc">Connected to voice. Add a song to start.</div>
+          <button type="button" class="btn-primary" onclick="openPlayModal()">Play Music</button>
+          <button type="button" class="btn-ghost" onclick="leaveChannel()">Leave Voice</button>
+        </div>
+
+        <div class="music-grid hidden" id="playerUI">
+          <div class="glass-card">
+            <div class="guild-badge">
+              <img id="guildIcon" src="" class="guild-icon" alt="">
+              <div class="guild-info">
+                <span id="guildName">Guild</span> • <span id="channelName" class="channel-name">#Channel</span>
+              </div>
+            </div>
+
+            <div class="art-section">
+              <div class="art-wrapper">
+                <img id="trackCover" src="" class="track-art" alt="">
+                <div id="wavebar" class="wavebar">
+                  <div class="wavebar-bar"></div>
+                  <div class="wavebar-bar"></div>
+                  <div class="wavebar-bar"></div>
+                  <div class="wavebar-bar"></div>
+                  <div class="wavebar-bar"></div>
+                </div>
+              </div>
+
+              <h2 id="trackTitle" class="track-title">Loading...</h2>
+              <div id="trackArtist" class="track-artist">Please wait</div>
+
+              <div class="seekbar-wrap">
+                <span id="currTime" class="time-label">0:00</span>
+                <div class="seekbar-track">
+                  <div id="seekbarFill" class="seekbar-fill"></div>
+                </div>
+                <span id="totalTime" class="time-label right">0:00</span>
+              </div>
+
+              <div class="controls-row">
+                <button type="button" class="ctrl-btn" onclick="seek(-10000)" title="Rewind 10s">
+                  <svg viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
+                </button>
+                <button type="button" class="ctrl-btn" onclick="prevSong()" title="Previous">
+                  <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                </button>
+                <button type="button" class="ctrl-btn primary danger" onclick="stopMusic()" title="Stop">
+                  <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                </button>
+                <button type="button" class="ctrl-btn" onclick="skipSong()" title="Skip">
+                  <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                </button>
+                <button type="button" class="ctrl-btn" onclick="seek(10000)" title="Forward 10s">
+                  <svg viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>
+                </button>
+              </div>
+
+              <div class="extra-row">
+                <button type="button" id="btnLoop" class="pill-btn" onclick="toggleLoop()">
+                  <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg> Off
+                </button>
+                <button type="button" id="btnAutoplay" class="pill-btn" onclick="toggleAutoplay()">
+                  <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg> Off
+                </button>
+              </div>
+
+              <div class="volume-row">
+                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                <input type="range" id="volumeSlider" class="volume-slider" min="0" max="500" value="100">
+                <span id="volumeVal" class="volume-val">100%</span>
+              </div>
+
+              <div id="statusToast" class="status-toast"></div>
+            </div>
+          </div>
+
+          <div class="queue-panel">
+            <div class="queue-header">
+              <span class="queue-header-title">Up Next</span>
+              <span id="queueBadge" class="queue-badge">0</span>
+            </div>
+            <div id="queueList" class="queue-list">
+              <div class="queue-empty">Queue is empty</div>
+            </div>
+            <button type="button" class="add-song-btn" onclick="openPlayModal()">+ Add Song</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="playModal" class="modal-overlay">
+        <div class="modal-box">
+          <div class="modal-title">Play Music</div>
+          <input type="text" id="playInput" class="modal-input" placeholder="Song name or URL..." onkeypress="handleEnter(event)">
+          <div class="modal-actions">
+            <button type="button" class="btn-primary" onclick="playSong()">Play / Add</button>
+            <button type="button" class="btn-secondary" onclick="closePlayModal()">Cancel</button>
+          </div>
+          <div class="fav-section">
+            <div class="fav-label">Favorites</div>
+            <div id="favContainer"><span class="fav-muted">Loading...</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/music.js"></script>
+</body>
+
+</html>

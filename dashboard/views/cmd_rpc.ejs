@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPC Configuration - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+            <a href="/commands" class="module-back">← Back</a>
+
+            <header class="page-header">
+                <div>
+                    <p class="page-header__eyebrow">Commands</p>
+                    <h1 class="page-header__title">Rich Presence</h1>
+                    <p class="page-header__hint">Customize your activity status visible to others.</p>
+                </div>
+            </header>
+
+            <div class="rpc-container">
+
+                <form id="rpcForm" onsubmit="saveRpc(event)">
+
+                    <div class="section-card">
+                        <div class="status-row">
+                            <span class="status-row__label">Enable RPC</span>
+                            <label class="switch">
+                                <input type="checkbox" id="enabled" onchange="saveRpc(null, true)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="input-group">
+                                <label class="input-label">Activity Type</label>
+                                <select id="type" class="input-field">
+                                    <option value="PLAYING">Playing</option>
+                                    <option value="STREAMING">Streaming</option>
+                                    <option value="LISTENING">Listening</option>
+                                    <option value="WATCHING">Watching</option>
+                                    <option value="COMPETING">Competing</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Name (Top Line)</label>
+                                <input type="text" id="name" class="input-field" placeholder="e.g. Hymn+ Bot">
+                            </div>
+                            <div class="input-group full-width">
+                                <label class="input-label">Application ID (Optional)</label>
+                                <input type="text" id="applicationId" class="input-field" placeholder="Default: Your User ID">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-card">
+                        <div class="section-title">Details & State</div>
+                        <div class="form-grid">
+                            <div class="input-group full-width">
+                                <label class="input-label">Details (Second Line)</label>
+                                <input type="text" id="details" class="input-field" placeholder="e.g. Preparing for battle">
+                            </div>
+                            <div class="input-group full-width">
+                                <label class="input-label">State (Third Line)</label>
+                                <input type="text" id="state" class="input-field" placeholder="e.g. Level 99">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-card">
+                            <div class="section-title">Time Details & Progress Bar</div>
+
+                            <div class="status-row status-row--loose">
+                                <span class="status-row__label">Enable Progress Bar (Spotify Style)</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="enableProgressBar" onchange="toggleProgressBarOptions()">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+
+                            <div class="form-grid" id="normalTimeGroup">
+                                <div class="input-group">
+                                    <label class="input-label" id="lblStartTime">Start Time From Now</label>
+                                    <input type="number" id="timeVal" class="input-field" placeholder="e.g. 5" min="0">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label" id="lblStartUnit">Unit</label>
+                                    <select id="timeUnit" class="input-field">
+                                        <option value="minute">Minutes</option>
+                                        <option value="hour">Hours</option>
+                                        <option value="day">Days</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-grid form-grid--spaced" id="endTimeGroup">
+                                <div class="input-group">
+                                    <label class="input-label">Total Duration (End Time)</label>
+                                    <input type="number" id="endVal" class="input-field" placeholder="e.g. 5" min="0">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label">Unit</label>
+                                    <select id="endUnit" class="input-field">
+                                        <option value="minute">Minutes</option>
+                                        <option value="hour">Hours</option>
+                                        <option value="day">Days</option>
+                                    </select>
+                                </div>
+                            </div>
+                    </div>
+
+                    <div class="section-card neon-card">
+                            <div class="section-title">Spoofing (Application Override)</div>
+                            <div class="status-row status-row--tight">
+                                <span class="status-row__label">Enable Spoofing</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="spoofEnabled" onchange="toggleSpoofing()">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <p class="form-note">Enabling this will override the Application ID above with official app IDs to show their icons.</p>
+
+                            <div id="spoofOptionContainer">
+                                <input type="hidden" id="spoofType" value="none">
+                                <div class="platform-grid">
+                                    <div class="platform-btn" id="btnCrunchyroll" onclick="selectSpoof('crunchyroll')">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Crunchyroll_Logo.png" alt="CR">
+                                        Crunchyroll
+                                    </div>
+                                    <div class="platform-btn" id="btnPlaystation" onclick="selectSpoof('playstation')">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Playstation_logo_colour.svg" alt="PS">
+                                        PlayStation 5
+                                    </div>
+                                </div>
+                            </div>
+                    </div>
+
+                    <div class="section-card neon-card-red" id="gameSpoofingSection">
+                            <div class="section-title section-title--danger">Game Spoofing</div>
+                            <div class="status-row status-row--tight">
+                                <span class="status-row__label">Enable Game Spoofing</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="gameSpoofing" onchange="toggleGameSpoofing(true)">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <p class="form-note">Enabling this will override ALL other RPC settings above and natively display a pre-built custom game.</p>
+
+                            <div id="gameSpoofOptionContainer">
+                                <input type="hidden" id="selectedGame" value="none">
+                                <div class="platform-grid">
+                                    <div class="platform-btn" id="btnMinecraft" onclick="selectGame('minecraft', true)">
+                                        <img class="platform-btn__img" src="https://cdn.discordapp.com/app-icons/1402418491272986635/166fbad351ecdd02d11a3b464748f66b.png?size=240&keep_aspect_ratio=false" alt="MC">
+                                        Minecraft
+                                    </div>
+                                    <div class="platform-btn" id="btnGenshin" onclick="selectGame('genshin', true)">
+                                        <img class="platform-btn__img" src="https://cdn.discordapp.com/app-icons/762434991303950386/eb0e25b739e4fa38c1671a3d1edcd1e0.png?size=240&keep_aspect_ratio=false" alt="GI">
+                                        Genshin Impact
+                                    </div>
+                                </div>
+                            </div>
+                    </div>
+
+                    <div class="section-card">
+                            <div class="section-title">Images (Assets)</div>
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <label class="input-label">Large Image URL</label>
+                                    <input type="text" id="largeImage" class="input-field" placeholder="https://...">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label">Large Image Tooltip</label>
+                                    <input type="text" id="largeText" class="input-field" placeholder="Text when hovering image">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label">Small Image URL</label>
+                                    <input type="text" id="smallImage" class="input-field" placeholder="https://...">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label">Small Image Tooltip</label>
+                                    <input type="text" id="smallText" class="input-field" placeholder="Text when hovering small image">
+                                </div>
+                            </div>
+                    </div>
+
+                    <div class="section-card">
+                            <div class="section-title">Interactive Buttons</div>
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <label class="input-label">Button 1 Label</label>
+                                    <input type="text" id="button1Text" class="input-field" placeholder="Visit Website">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label">Button 1 URL</label>
+                                    <input type="text" id="button1Url" class="input-field" placeholder="https://...">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label">Button 2 Label</label>
+                                    <input type="text" id="button2Text" class="input-field" placeholder="Join Server">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label">Button 2 URL</label>
+                                    <input type="text" id="button2Url" class="input-field" placeholder="https://...">
+                                </div>
+                            </div>
+                            <p class="form-note">Note: Discord prevents you from clicking your own RPC buttons. Ask others to verify they work.</p>
+                    </div>
+
+                    <button type="submit" class="btn-save" id="saveBtn">Save Configuration</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+            window.onload = async () => {
+                try {
+                    const res = await fetch('/api/rpc');
+                    const data = await res.json();
+
+                    document.getElementById('enabled').checked = data.enabled;
+                    document.getElementById('type').value = data.type || 'PLAYING';
+                    document.getElementById('name').value = data.name || '';
+                    document.getElementById('applicationId').value = data.applicationId || '';
+                    document.getElementById('details').value = data.details || '';
+                    document.getElementById('state').value = data.state || '';
+
+                    const spoofEnabled = data.spoofEnabled || false;
+                    document.getElementById('spoofEnabled').checked = spoofEnabled;
+                    document.getElementById('spoofType').value = data.spoofType || 'none';
+
+                    const gameSpoofing = data.gameSpoofing || false;
+                    document.getElementById('gameSpoofing').checked = gameSpoofing;
+                    document.getElementById('selectedGame').value = data.selectedGame || 'none';
+
+                    toggleSpoofing();
+                    toggleGameSpoofing();
+
+                    const enableProgressBar = data.enableProgressBar || false;
+                    document.getElementById('enableProgressBar').checked = enableProgressBar;
+
+                    if (data.startTimestamp && data.startTimestamp > 0) {
+                        const ms = data.startTimestamp;
+                        if (ms >= 86400000 && ms % 86400000 === 0) {
+                            document.getElementById('timeVal').value = ms / 86400000;
+                            document.getElementById('timeUnit').value = 'day';
+                        } else if (ms >= 3600000 && ms % 3600000 === 0) {
+                            document.getElementById('timeVal').value = ms / 3600000;
+                            document.getElementById('timeUnit').value = 'hour';
+                        } else if (ms >= 60000) {
+                            document.getElementById('timeVal').value = Math.floor(ms / 60000);
+                            document.getElementById('timeUnit').value = 'minute';
+                        } else {
+                            document.getElementById('timeVal').value = '';
+                            document.getElementById('timeUnit').value = 'none';
+                        }
+                    } else {
+                        document.getElementById('timeUnit').value = 'none';
+                    }
+
+                    if (data.endTimestamp && data.endTimestamp > 0) {
+                        const ms = data.endTimestamp;
+                        if (ms >= 86400000 && ms % 86400000 === 0) {
+                            document.getElementById('endVal').value = ms / 86400000;
+                            document.getElementById('endUnit').value = 'day';
+                        } else if (ms >= 3600000 && ms % 3600000 === 0) {
+                            document.getElementById('endVal').value = ms / 3600000;
+                            document.getElementById('endUnit').value = 'hour';
+                        } else if (ms >= 60000) {
+                            document.getElementById('endVal').value = Math.floor(ms / 60000);
+                            document.getElementById('endUnit').value = 'minute';
+                        } else {
+                            document.getElementById('endVal').value = '';
+                            document.getElementById('endUnit').value = 'none';
+                        }
+                    } else {
+                        document.getElementById('endUnit').value = 'none';
+                    }
+
+                    toggleProgressBarOptions(true);
+
+                    document.getElementById('largeImage').value = data.largeImage || '';
+                    document.getElementById('largeText').value = data.largeText || '';
+                    document.getElementById('smallImage').value = data.smallImage || '';
+                    document.getElementById('smallText').value = data.smallText || '';
+
+                    document.getElementById('button1Text').value = data.button1Text || '';
+                    document.getElementById('button1Url').value = data.button1Url || '';
+                    document.getElementById('button2Text').value = data.button2Text || '';
+                    document.getElementById('button2Url').value = data.button2Url || '';
+                } catch (e) { console.error(e); }
+            };
+
+            async function saveRpc(e, silent = false) {
+                if (e) e.preventDefault();
+
+                const btn = document.getElementById('saveBtn');
+                const originalText = "Save Configuration";
+
+                if (!silent) {
+                    btn.innerText = "Saving...";
+                    btn.disabled = true;
+                }
+
+                const data = {
+                    enabled: document.getElementById('enabled').checked,
+                    type: document.getElementById('type').value,
+                    name: document.getElementById('name').value,
+                    applicationId: document.getElementById('applicationId').value,
+                    details: document.getElementById('details').value,
+                    state: document.getElementById('state').value,
+
+                    spoofEnabled: document.getElementById('spoofEnabled').checked,
+                    spoofType: document.getElementById('spoofType').value,
+
+                    gameSpoofing: document.getElementById('gameSpoofing').checked,
+                    selectedGame: document.getElementById('selectedGame').value,
+
+                    enableProgressBar: document.getElementById('enableProgressBar').checked,
+                    startTimestamp: calculateMs('timeVal', 'timeUnit'),
+                    endTimestamp: calculateMs('endVal', 'endUnit'),
+
+                    largeImage: document.getElementById('largeImage').value,
+                    largeText: document.getElementById('largeText').value,
+                    smallImage: document.getElementById('smallImage').value,
+                    smallText: document.getElementById('smallText').value,
+
+                    button1Text: document.getElementById('button1Text').value,
+                    button1Url: document.getElementById('button1Url').value,
+                    button2Text: document.getElementById('button2Text').value,
+                    button2Url: document.getElementById('button2Url').value,
+                };
+
+                try {
+                    const res = await fetch('/api/rpc', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    const result = await res.json();
+
+                    if (result.success) {
+                        if (!silent) {
+                            btn.innerText = "Saved Successfully!";
+                            btn.style.background = "#2ecc71";
+                            setTimeout(() => {
+                                btn.innerText = originalText;
+                                btn.style.background = "";
+                                btn.disabled = false;
+                            }, 2000);
+                        } else {
+                            showToast('Auto-saved ✓', '#2ecc71');
+                        }
+                    } else {
+                        if (!silent) {
+                            showToast('Failed to save.', 'error');
+                            btn.innerText = originalText;
+                            btn.disabled = false;
+                        } else {
+                            showToast('Save failed ✗', '#e74c3c');
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                    if (!silent) {
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    }
+                }
+            }
+
+            function calculateMs(valId, unitId) {
+                const val = parseInt(document.getElementById(valId).value);
+                const unit = document.getElementById(unitId).value;
+
+                if (!val || val < 0 || unit === 'none') return 0;
+
+                if (unit === 'minute') return val * 60 * 1000;
+                if (unit === 'hour') return val * 60 * 60 * 1000;
+                if (unit === 'day') return val * 24 * 60 * 60 * 1000;
+                return 0;
+            }
+
+            function toggleProgressBarOptions(isInit = false) {
+                const isEnabled = document.getElementById('enableProgressBar').checked;
+                const endGroup = document.getElementById('endTimeGroup');
+                const lblStart = document.getElementById('lblStartTime');
+
+                if (isEnabled) {
+                    endGroup.style.display = 'grid';
+                    lblStart.innerText = "Time Passed Already (Position)";
+                } else {
+                    endGroup.style.display = 'none';
+                    lblStart.innerText = "Start Time From Now";
+                }
+            }
+
+            function toggleSpoofing() {
+                const isEnabled = document.getElementById('spoofEnabled').checked;
+                const container = document.getElementById('spoofOptionContainer');
+                const appIdField = document.getElementById('applicationId');
+
+                if (isEnabled) {
+                    container.style.opacity = '1';
+                    container.style.pointerEvents = 'auto';
+                    appIdField.disabled = true;
+                    appIdField.style.opacity = '0.5';
+                    if (document.getElementById('spoofType').value === 'none') {
+                        selectSpoof('crunchyroll');
+                    } else {
+                        selectSpoof(document.getElementById('spoofType').value);
+                    }
+                } else {
+                    container.style.opacity = '0.5';
+                    container.style.pointerEvents = 'none';
+                    appIdField.disabled = false;
+                    appIdField.style.opacity = '1';
+                }
+            }
+
+            function selectSpoof(type) {
+                document.getElementById('spoofType').value = type;
+                document.getElementById('btnCrunchyroll').classList.remove('active');
+                document.getElementById('btnPlaystation').classList.remove('active');
+
+                if (type === 'crunchyroll') {
+                    document.getElementById('btnCrunchyroll').classList.add('active');
+                } else if (type === 'playstation') {
+                    document.getElementById('btnPlaystation').classList.add('active');
+                }
+            }
+
+            function toggleGameSpoofing(autoSave = false) {
+                const isEnabled = document.getElementById('gameSpoofing').checked;
+                const container = document.getElementById('gameSpoofOptionContainer');
+
+                const fields = ['type', 'name', 'applicationId', 'details', 'state', 'largeImage', 'largeText', 'smallImage', 'smallText', 'button1Text', 'button1Url', 'button2Text', 'button2Url'];
+
+                if (isEnabled) {
+                    container.style.opacity = '1';
+                    container.style.pointerEvents = 'auto';
+
+                    if (document.getElementById('selectedGame').value === 'none') {
+                        selectGame('minecraft');
+                    } else {
+                        selectGame(document.getElementById('selectedGame').value);
+                    }
+
+                    fields.forEach(f => {
+                        const el = document.getElementById(f);
+                        if (el) {
+                            el.disabled = true;
+                            el.style.opacity = '0.3';
+                        }
+                    });
+
+                    document.getElementById('spoofEnabled').checked = false;
+                    document.getElementById('spoofEnabled').disabled = true;
+                    toggleSpoofing();
+                } else {
+                    container.style.opacity = '0.5';
+                    container.style.pointerEvents = 'none';
+
+                    fields.forEach(f => {
+                        const el = document.getElementById(f);
+                        if (el) {
+                            el.disabled = false;
+                            el.style.opacity = '1';
+                        }
+                    });
+
+                    document.getElementById('spoofEnabled').disabled = false;
+                }
+
+                if (autoSave) saveRpc(null, true);
+            }
+
+            function selectGame(game, autoSave = false) {
+                document.getElementById('selectedGame').value = game;
+                document.getElementById('btnMinecraft').classList.remove('active');
+                document.getElementById('btnGenshin').classList.remove('active');
+
+                if (game === 'minecraft') document.getElementById('btnMinecraft').classList.add('active');
+                if (game === 'genshin') document.getElementById('btnGenshin').classList.add('active');
+
+                if (autoSave) saveRpc(null, true);
+            }
+    </script>
+    <div id="toast-msg"></div>
+    <script>
+        function showToast(msg, color = '#2ecc71') {
+            const t = document.getElementById('toast-msg');
+            t.textContent = msg;
+            t.style.background = color;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
+    </script>
+</body>
+
+</html>

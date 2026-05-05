@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hymn+ Quest Terminal</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell quest-page">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+            <header class="page-header">
+                <div>
+                    <p class="page-header__eyebrow">Automation</p>
+                    <h1 class="page-header__title">Quest Terminal</h1>
+                    <p class="page-header__hint">Auto-complete Discord quests in the background.</p>
+                </div>
+                <div class="page-chip">LIVE</div>
+            </header>
+
+    <div class="terminal-container">
+        <div class="terminal-window">
+            <div class="terminal-header">
+                <span class="terminal-title">user@hymn:~/quests$ ./complete_all</span>
+                <span id="statusBadge" class="quest-status-badge">Idle</span>
+                <div class="terminal-controls">
+                    <button type="button" onclick="startAll()" class="btn-t btn-start">START ALL</button>
+                    <button type="button" onclick="stopAll()" class="btn-t btn-stop" disabled>STOP ALL</button>
+                    <button type="button" onclick="clearConsole()" class="btn-t">CLEAR</button>
+                </div>
+            </div>
+            <div class="terminal-body" id="terminalOutput">
+                <div class="log-line log-line--muted">Ready to initialize quest protocols...</div>
+                <div class="log-line log-line--muted">Click 'START ALL' to begin.</div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </main>
+        <script>
+            const terminalBody = document.getElementById('terminalOutput');
+            let knownLogs = new Set();
+            let autoScroll = true;
+
+            terminalBody.addEventListener('scroll', () => {
+                const isAtBottom = terminalBody.scrollHeight - terminalBody.scrollTop <= terminalBody.clientHeight + 50;
+                autoScroll = isAtBottom;
+            });
+
+            function appendLog(text) {
+                if (knownLogs.has(text)) return;
+                knownLogs.add(text);
+                const div = document.createElement('div');
+                div.className = 'log-line new-log';
+                div.innerText = text;
+                if (text.includes('Error')) div.style.color = '#ff5f5f';
+                else if (text.includes('COMPLETED')) div.style.color = '#ffff00';
+                else if (text.includes('Progress')) div.style.color = '#aaaaaa';
+                else if (text.includes('Spoofing')) div.style.color = '#00ffff';
+                terminalBody.appendChild(div);
+                if (autoScroll) terminalBody.scrollTop = terminalBody.scrollHeight;
+                if (terminalBody.children.length > 500) terminalBody.removeChild(terminalBody.firstChild);
+            }
+
+            async function startAll() {
+                appendLog("> Starting process...");
+                try { await fetch('/quest/start-all', { method: 'POST' }); }
+                catch (e) { appendLog(`> Error: ${e.message}`); }
+            }
+
+            async function stopAll() {
+                appendLog("> Stopping all tasks...");
+                try { await fetch('/quest/stop-all', { method: 'POST' }); }
+                catch (e) { appendLog(`> Error: ${e.message}`); }
+            }
+
+            async function clearConsole() {
+                terminalBody.innerHTML = '';
+                knownLogs.clear();
+                try { await fetch('/quest/clear-logs', { method: 'POST' }); } catch (e) { }
+            }
+
+            async function pollLogs() {
+                try {
+                    const res = await fetch('/api/quests');
+                    const data = await res.json();
+
+                    const btnStart = document.querySelector('.btn-start');
+                    const btnStop = document.querySelector('.btn-stop');
+
+                    const badge = document.getElementById('statusBadge');
+                    if (data.isRunning) {
+                        btnStart.disabled = true;
+                        btnStart.style.opacity = '0.5';
+                        btnStart.style.cursor = 'not-allowed';
+                        btnStop.disabled = false;
+                        btnStop.style.opacity = '1';
+                        btnStop.style.cursor = 'pointer';
+                        badge.textContent = '🟢 Running';
+                        badge.style.color = '#23a559';
+                    } else {
+                        btnStart.disabled = false;
+                        btnStart.style.opacity = '1';
+                        btnStart.style.cursor = 'pointer';
+                        btnStop.disabled = true;
+                        btnStop.style.opacity = '0.5';
+                        btnStop.style.cursor = 'not-allowed';
+                        badge.textContent = '⚫ Idle';
+                        badge.style.color = '#666';
+                    }
+
+                    if (data.logs) {
+                        data.logs.slice().reverse().forEach(log => {
+                            appendLog(log);
+                        });
+                    }
+                } catch (e) { }
+            }
+            var questPollId = null;
+            function scheduleQuestPoll() {
+                if (questPollId) clearInterval(questPollId);
+                questPollId = setInterval(pollLogs, document.hidden ? 4000 : 1500);
+            }
+            document.addEventListener('visibilitychange', function () {
+                scheduleQuestPoll();
+                if (!document.hidden) pollLogs();
+            });
+            scheduleQuestPoll();
+            pollLogs();
+        </script>
+</body>
+
+</html>

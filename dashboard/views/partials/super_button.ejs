@@ -1,0 +1,174 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="/js/dashboard-utils.js"></script>
+
+<button type="button" class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar">
+    <i class="fas fa-bars" aria-hidden="true"></i>
+</button>
+
+<nav id="sidebar" class="sidebar" aria-label="Main navigation">
+    <div class="sidebar__brand">
+        <span class="sidebar__mark">H+</span>
+        <div class="sidebar__lockup">
+            <span class="sidebar__name">Hymn+</span>
+            <span class="sidebar__tag">Control</span>
+        </div>
+        <button type="button" class="sidebar__collapse" id="sidebarCollapseBtn" onclick="toggleSidebarCollapse()" aria-expanded="true" title="Collapse sidebar" aria-label="Collapse sidebar">
+            <i class="fas fa-angles-left" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <div class="sidebar__scroll">
+        <p class="sidebar__label">Navigate</p>
+        <a href="/" class="nav-item <%= page === 'home' ? 'nav-item--active' : '' %>">
+            <span class="nav-item__ico"><i class="fas fa-chart-line" aria-hidden="true"></i></span>
+            <span class="nav-item__text">Dashboard</span>
+        </a>
+        <a href="/music" class="nav-item <%= page === 'music' ? 'nav-item--active' : '' %>">
+            <span class="nav-item__ico"><i class="fas fa-headphones" aria-hidden="true"></i></span>
+            <span class="nav-item__text">Music</span>
+        </a>
+        <a href="/ai" class="nav-item <%= page === 'ai' ? 'nav-item--active' : '' %>">
+            <span class="nav-item__ico"><i class="fas fa-microchip" aria-hidden="true"></i></span>
+            <span class="nav-item__text">AI Chat</span>
+        </a>
+        <a href="/quest" class="nav-item <%= page === 'quest' ? 'nav-item--active' : '' %>">
+            <span class="nav-item__ico"><i class="fas fa-diagram-project" aria-hidden="true"></i></span>
+            <span class="nav-item__text">Quests</span>
+        </a>
+
+        <p class="sidebar__label">Operations</p>
+        <a href="/commands" class="nav-item <%= page === 'commands' ? 'nav-item--active' : '' %>">
+            <span class="nav-item__ico"><i class="fas fa-sliders" aria-hidden="true"></i></span>
+            <span class="nav-item__text">Commands</span>
+        </a>
+        <a href="/afk" class="nav-item <%= page === 'afk' ? 'nav-item--active' : '' %>">
+            <span class="nav-item__ico"><i class="fas fa-moon" aria-hidden="true"></i></span>
+            <span class="nav-item__text">AFK</span>
+        </a>
+        <a href="/server-cloner" class="nav-item <%= page === 'cloner' ? 'nav-item--active' : '' %>">
+            <span class="nav-item__ico"><i class="fas fa-database" aria-hidden="true"></i></span>
+            <span class="nav-item__text">Cloner</span>
+        </a>
+    </div>
+
+    <div class="sidebar__footer sidebar-footer">
+        <% if (typeof user !== 'undefined' && user) { %>
+        <div class="sidebar-account-switcher">
+            <form action="/switch-account" method="POST" id="accountSwitchForm">
+                <select name="index" onchange="document.getElementById('accountSwitchForm').submit()" class="account-select">
+                    <% for (var i = 0; i < (typeof accountCount !== 'undefined' ? accountCount : 3); i++) { %>
+                    <option value="<%= i %>">Account <%= i + 1 %><%= i === 0 ? ' (Main)' : '' %></option>
+                    <% } %>
+                </select>
+            </form>
+        </div>
+        <div class="sidebar-user">
+            <img src="<%= user.displayAvatarURL({ format: 'png', size: 64 }) %>" alt="" class="sidebar-user-avatar">
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name"><%= user.username %></div>
+                <div class="sidebar-user-status">Signed in</div>
+            </div>
+        </div>
+        <% } %>
+        <a href="/logout" class="sidebar-logout">
+            <i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i>
+            <span>Log out</span>
+        </a>
+    </div>
+</nav>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()" aria-hidden="true" role="presentation"></div>
+
+<script>
+    (function () {
+        var c = localStorage.getItem('hymn_sidebar_collapsed');
+        if (c === '1') document.documentElement.setAttribute('data-sidebar', 'collapsed');
+    })();
+
+    function toggleSidebarCollapse() {
+        // Di mobile, collapse button tidak digunakan
+        if (window.innerWidth <= 768) return;
+        var html = document.documentElement;
+        var wasCollapsed = html.getAttribute('data-sidebar') === 'collapsed';
+        if (wasCollapsed) {
+            html.removeAttribute('data-sidebar');
+            localStorage.setItem('hymn_sidebar_collapsed', '0');
+        } else {
+            html.setAttribute('data-sidebar', 'collapsed');
+            localStorage.setItem('hymn_sidebar_collapsed', '1');
+        }
+        var btn = document.getElementById('sidebarCollapseBtn');
+        var nowCollapsed = html.getAttribute('data-sidebar') === 'collapsed';
+        if (btn) {
+            btn.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
+            var expandLabel = 'Expand sidebar';
+            var collapseLabel = 'Collapse sidebar';
+            btn.setAttribute('title', nowCollapsed ? expandLabel : collapseLabel);
+            btn.setAttribute('aria-label', nowCollapsed ? expandLabel : collapseLabel);
+        }
+        var icon = btn && btn.querySelector('i');
+        if (icon) icon.className = nowCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left';
+    }
+
+    (function syncCollapseIcon() {
+        var btn = document.getElementById('sidebarCollapseBtn');
+        if (!btn) return;
+        var collapsed = document.documentElement.getAttribute('data-sidebar') === 'collapsed';
+        btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        var expandLabel = 'Expand sidebar';
+        var collapseLabel = 'Collapse sidebar';
+        btn.setAttribute('title', collapsed ? expandLabel : collapseLabel);
+        btn.setAttribute('aria-label', collapsed ? expandLabel : collapseLabel);
+        var icon = btn.querySelector('i');
+        if (icon) icon.className = collapsed ? 'fas fa-angles-right' : 'fas fa-angles-left';
+    })();
+
+    function toggleSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        var hBtn = document.getElementById('hamburgerBtn');
+        if (!sidebar || !overlay || !hBtn) return;
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('visible');
+        var icon = hBtn.querySelector('i');
+        var isOpen = sidebar.classList.contains('open');
+        if (icon) icon.className = isOpen ? 'fas fa-times' : 'fas fa-bars';
+        hBtn.setAttribute('aria-label', isOpen ? 'Close menu' : 'Open menu');
+        hBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        overlay.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        // Lock/unlock body scroll
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+        // Fallback untuk browser yang ga support :has() - paksa via inline style
+        overlay.style.display = isOpen ? 'block' : '';
+    }
+
+    window.addEventListener('resize', function () {
+        if (window.innerWidth > 768) {
+            var sidebar = document.getElementById('sidebar');
+            var overlay = document.getElementById('sidebarOverlay');
+            var hBtn = document.getElementById('hamburgerBtn');
+            if (sidebar) sidebar.classList.remove('open');
+            if (overlay) {
+                overlay.classList.remove('visible');
+                overlay.setAttribute('aria-hidden', 'true');
+            }
+            if (hBtn) {
+                var icon = hBtn.querySelector('i');
+                if (icon) icon.className = 'fas fa-bars';
+                hBtn.setAttribute('aria-label', 'Open menu');
+                hBtn.setAttribute('aria-expanded', 'false');
+            }
+            // Reset scroll lock saat kembali ke desktop
+            document.body.style.overflow = '';
+        }
+    });
+
+    var getCookie = function (name) {
+        var value = '; ' + document.cookie;
+        var parts = value.split('; ' + name + '=');
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '0';
+    };
+    var accountSelect = document.querySelector('.account-select');
+    if (accountSelect) accountSelect.value = getCookie('active_account') || '0';
+</script>

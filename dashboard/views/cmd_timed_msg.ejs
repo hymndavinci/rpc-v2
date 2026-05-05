@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timed Messages - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+    <a href="/commands" class="module-back">← Back</a>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>Timed Messages</h1>
+            <p>Schedule a message to be sent at a specific future date and time.</p>
+        </div>
+
+        <!-- Add New Config -->
+        <div class="section-card">
+            <div class="section-title">Schedule New Message</div>
+
+            <div class="input-group">
+                <label class="input-label">Channel or User ID (DM)</label>
+                <input type="text" id="channelId" class="input-field" placeholder="Enter Channel/User ID"
+                    oninput="validateChannel()">
+                <!-- Preview -->
+                <div id="channelPreview" style="margin-top: 10px; display: none;"></div>
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label class="input-label">Date (MM/DD)</label>
+                    <input type="text" id="msgDate" class="input-field" placeholder="02/23">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Time (12h)</label>
+                    <input type="text" id="msgTime" class="input-field" placeholder="11:43 PM">
+                </div>
+            </div>
+            <div style="font-size: 0.8rem; color: #666; margin-bottom: 15px; text-align: right;">
+                <i class="fas fa-globe"></i> Your Timezone: <span id="userTimezone">Detecting...</span>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Message Content</label>
+                <textarea id="messageContent" class="input-field" placeholder="Type your message here..."
+                    style="resize: vertical; min-height: 100px;"></textarea>
+            </div>
+
+            <button id="btnSave" class="btn-add" disabled onclick="addTimedMsg()">Schedule Message</button>
+        </div>
+
+        <!-- List -->
+        <div class="section-card">
+            <div class="section-title">Scheduled Messages</div>
+            <div id="list">
+                <div class="no-items" style="text-align: center; color: #666;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+
+        </div>
+    </main>
+
+
+        <script>
+            let isChannelValid = false;
+            let debounceTimer;
+
+            // Detect Timezone
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            document.getElementById('userTimezone').innerText = timezone;
+
+            function validateChannel() {
+                clearTimeout(debounceTimer);
+                const id = document.getElementById('channelId').value.trim();
+                const preview = document.getElementById('channelPreview');
+                const btn = document.getElementById('btnSave');
+
+                isChannelValid = false;
+                btn.disabled = true;
+
+                if (id.length < 17) {
+                    preview.style.display = 'none';
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    preview.style.display = 'block';
+                    preview.innerHTML = '<div style="color:#999; font-size:0.9rem;">Verifying...</div>';
+
+                    try {
+                        const res = await fetch('/api/validate/mixed', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id })
+                        });
+
+                        if (res.ok) {
+                            const info = await res.json();
+                            const isUser = info.type === 'user';
+                            var radius = isUser ? '50%' : '5px';
+                            var ic = safeHttpsUrl(
+                                info.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'
+                            );
+                            preview.innerHTML =
+                                '<div class="channel-preview">' +
+                                '<img class="cp-icon" src="" alt="" style="border-radius:' +
+                                radius +
+                                '">' +
+                                '<div class="cp-info">' +
+                                '<div class="cp-name">' +
+                                (isUser ? '@' : '#') +
+                                escapeHtml(String(info.name != null ? info.name : '')) +
+                                '</div><div class="cp-sub">' +
+                                escapeHtml(String(info.guildName != null ? info.guildName : '')) +
+                                '</div></div></div>';
+                            var im = preview.querySelector('.cp-icon');
+                            if (im) im.src = ic;
+                            isChannelValid = true;
+                            btn.disabled = false;
+                        } else {
+                            const err = await res.json();
+                            preview.innerHTML =
+                                '<div style="color:#e74c3c; padding:5px; font-size:0.9rem;">Error: ' +
+                                escapeHtml(String(err.error != null ? err.error : '')) +
+                                '</div>';
+                        }
+                    } catch (e) {
+                        preview.innerHTML = `<div style="color:#e74c3c; padding:5px;">Validation Failed</div>`;
+                    }
+                }, 600);
+            }
+
+            async function loadData() {
+                try {
+                    const res = await fetch('/api/timed-msg');
+                    const list = await res.json();
+                    render(list);
+                } catch (e) {
+                    document.getElementById('list').innerHTML = '<div style="color:#e74c3c; text-align:center;">Failed to load.</div>';
+                }
+            }
+
+            function render(list) {
+                const listObj = document.getElementById('list');
+                listObj.innerHTML = '';
+
+                if (list.length === 0) {
+                    listObj.innerHTML = '<div class="no-items" style="text-align: center; color: #666; font-style: italic;">No scheduled messages.</div>';
+                    return;
+                }
+
+                // Sort by time
+                list.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                list.forEach(function (item) {
+                    const date = new Date(item.timestamp);
+                    const dateStr = date.toLocaleString(); // Use browser locale
+                    const timeLeft = getTimeLeft(date);
+
+                    listObj.innerHTML +=
+                        '<div class="msg-item">' +
+                        '<div class="msg-info">' +
+                        '<div class="msg-title">' +
+                        '<i class="fas fa-hashtag"></i> ' +
+                        escapeHtml(String(item.channelId != null ? item.channelId : '')) +
+                        '<span style="font-size:0.75rem; color:#a29bfe; margin-left:10px; background:rgba(138,43,226,0.1); padding:2px 8px; border-radius:10px; white-space:nowrap;">' +
+                        escapeHtml(String(timeLeft)) +
+                        '</span></div>' +
+                        '<div class="msg-detail">' +
+                        escapeHtml(String(item.message != null ? item.message : '')) +
+                        '</div>' +
+                        '<div class="msg-meta"><i class="fas fa-clock"></i> ' +
+                        escapeHtml(String(dateStr)) +
+                        '</div></div>' +
+                        '<button type="button" class="btn-delete" onclick="deleteItem(' +
+                        JSON.stringify(String(item.id != null ? item.id : '')) +
+                        ')"><i class="fas fa-trash"></i></button></div>';
+                });
+            }
+
+            function getTimeLeft(target) {
+                const now = new Date();
+                const diff = target - now;
+
+                if (diff <= 0) return "Pending...";
+
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+                let str = "";
+                if (days > 0) str += `${days}d `;
+                if (hours > 0) str += `${hours}h `;
+                str += `${minutes}m`;
+                return str + " left";
+            }
+
+            async function addTimedMsg() {
+                const channelId = document.getElementById('channelId').value.trim();
+                const dateVal = document.getElementById('msgDate').value.trim();
+                const timeVal = document.getElementById('msgTime').value.trim();
+                const message = document.getElementById('messageContent').value.trim();
+                const btn = document.getElementById('btnSave');
+
+                if (!channelId || !dateVal || !timeVal || !message) return showToast('All fields required', 'warn');
+
+
+                const dateParts = dateVal.split('/');
+                if (dateParts.length !== 2) return showToast('Invalid date. Use MM/DD format', 'warn');
+                const month = parseInt(dateParts[0]);
+                const day = parseInt(dateParts[1]);
+                if (isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) return showToast('Invalid date numbers', 'warn');
+
+
+                const timeMatch = timeVal.match(/^(\d{1,2}):(\d{2})\s?(AM|PM|am|pm)$/i);
+                if (!timeMatch) return showToast('Invalid time. Use HH:MM AM/PM format', 'warn');
+
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const meridian = timeMatch[3].toUpperCase();
+
+                if (hours < 1 || hours > 12) return showToast('Invalid hour (1-12)', 'warn');
+                if (minutes < 0 || minutes > 59) return showToast('Invalid minutes (0-59)', 'warn');
+
+                if (meridian === 'PM' && hours !== 12) hours += 12;
+                if (meridian === 'AM' && hours === 12) hours = 0;
+
+
+                const now = new Date();
+                let year = now.getFullYear();
+
+
+                let targetDate = new Date(year, month - 1, day, hours, minutes, 0);
+
+
+                if (targetDate.getTime() < now.getTime()) {
+                    year++;
+                }
+
+                const pad = (n) => n < 10 ? '0' + n : n;
+                const timestamp = `${year}-${pad(month)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:00`;
+
+                const originalText = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = "Scheduling...";
+
+                try {
+                    const res = await fetch('/api/timed-msg', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'add', channelId, message, timestamp, timezone })
+                    });
+
+                    if (res.ok) {
+                        btn.style.background = '#2ecc71';
+                        btn.innerText = "Scheduled!";
+
+                        setTimeout(() => {
+                            btn.style.background = '';
+                            btn.innerText = originalText;
+                            btn.disabled = false;
+                            validateChannel();
+                        }, 1000);
+
+
+                        document.getElementById('messageContent').value = '';
+
+                        document.getElementById('msgDate').value = '';
+                        document.getElementById('msgTime').value = '';
+                        loadData();
+                    } else {
+                        const err = await res.json();
+                        showToast('Failed: ' + (err.error || 'Unknown error'), 'error');
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
+                } catch (e) {
+                    showToast('Error processing request', 'error');
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            }
+
+            async function deleteItem(id) {
+                if (!confirm('Cancel this scheduled message?')) return;
+                try {
+                    await fetch('/api/timed-msg', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'remove', id })
+                    });
+                    loadData();
+                } catch (e) { showToast('An error occurred', 'error'); }
+            }
+
+            window.onload = loadData;
+        </script>
+</body>
+
+</html>

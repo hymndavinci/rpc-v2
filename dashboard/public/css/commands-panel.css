@@ -1,0 +1,105 @@
+/* Commands hub — Neobrutalist */
+
+.cmd-container {
+    width: 100%;
+    padding: 24px 4px 100px;
+}
+
+.cmd-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+    gap: 14px;
+}
+
+.cmd-card {
+    background: var(--surface);
+    border: var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 16px;
+    align-items: center;
+    min-height: 100px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition:
+        box-shadow 0.1s ease,
+        transform 0.1s ease;
+    position: relative;
+}
+
+.cmd-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translate(-2px, -2px);
+}
+
+.cmd-card:active {
+    box-shadow: var(--shadow-active);
+    transform: translate(2px, 2px);
+}
+
+.card-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    background: var(--accent-yellow);
+    border: var(--border);
+    box-shadow: var(--shadow-active);
+    color: var(--black);
+    flex-shrink: 0;
+}
+
+.card-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--black);
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+}
+
+.card-desc {
+    font-size: 13px;
+    color: var(--black);
+    line-height: 1.45;
+}
+
+.card-clone {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    transition:
+        top 0.45s cubic-bezier(0.19, 1, 0.22, 1),
+        left 0.45s cubic-bezier(0.19, 1, 0.22, 1),
+        width 0.45s cubic-bezier(0.19, 1, 0.22, 1),
+        height 0.45s cubic-bezier(0.19, 1, 0.22, 1),
+        border-radius 0.45s cubic-bezier(0.19, 1, 0.22, 1),
+        padding 0.45s cubic-bezier(0.19, 1, 0.22, 1);
+    background: var(--surface);
+    border: var(--border);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+}
+
+@media (max-width: 768px) {
+    .cmd-grid {
+        grid-template-columns: 1fr;
+    }
+    .cmd-card {
+        min-height: 0;
+        grid-template-columns: 48px 1fr;
+        padding: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .cmd-container {
+        padding: 16px 12px 80px;
+        width: 100%;
+    }
+}

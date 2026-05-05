@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Message - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+
+    <a href="/commands" class="module-back">← Back</a>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>Auto Msg</h1>
+            <p>Schedule automated messages for specific channels.</p>
+            <div
+                style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); color: #e74c3c; padding: 10px; border-radius: 8px; margin-top: 15px; font-size: 0.85rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+                <i class="fas fa-exclamation-triangle"></i> <strong>WARNING:</strong> Sending automated messages
+                repeatedly can get your account banned. Use this feature at your own risk. We are not responsible for
+                any consequences.
+            </div>
+        </div>
+
+        <!-- Add New Config -->
+        <div class="section-card">
+            <div class="section-title">Schedule New Message</div>
+
+            <div class="input-group">
+                <label class="input-label">Channel or User ID (DM)</label>
+                <input type="text" id="channelId" class="input-field" placeholder="Enter Channel/User ID"
+                    oninput="validateChannel()">
+                <!-- Preview -->
+                <div id="channelPreview" style="margin-top: 10px; display: none;"></div>
+            </div>
+
+            <div class="form-grid">
+                <div class="input-group">
+                    <label class="input-label">Interval Value</label>
+                    <input type="number" id="intervalVal" class="input-field" placeholder="e.g. 10" min="1">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Interval Unit</label>
+                    <select id="intervalUnit" class="input-field">
+                        <option value="second">Seconds</option>
+                        <option value="minute" selected>Minutes</option>
+                        <option value="hour">Hours</option>
+                        <option value="day">Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Message Content</label>
+                <textarea id="messageContent" class="input-field" placeholder="Type your message here..."
+                    style="resize: vertical; min-height: 100px; font-family: inherit;"></textarea>
+            </div>
+
+            <button id="btnSave" class="btn-add" disabled onclick="addAutoMsg()">Add Schedule</button>
+        </div>
+
+        <!-- List -->
+        <div class="section-card">
+            <div class="section-title">Active Schedules</div>
+            <div id="list">
+                <div class="no-items" style="text-align: center; color: #666;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+
+        </div>
+    </main>
+
+
+        <script>
+            let isChannelValid = false;
+            let debounceTimer;
+
+            function validateChannel() {
+                clearTimeout(debounceTimer);
+                const id = document.getElementById('channelId').value.trim();
+                const preview = document.getElementById('channelPreview');
+                const btn = document.getElementById('btnSave');
+
+                isChannelValid = false;
+                btn.disabled = true;
+
+                if (id.length < 17) {
+                    preview.style.display = 'none';
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    preview.style.display = 'block';
+                    preview.innerHTML = '<div style="color:#999; font-size:0.9rem;">Verifying...</div>';
+
+                    try {
+                        // Use new Mixed Validation (Channel/User)
+                        const res = await fetch('/api/validate/mixed', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id })
+                        });
+
+                        if (res.ok) {
+                            const info = await res.json();
+                            // Type: 'channel' or 'user'
+                            const isUser = info.type === 'user';
+                            var radius = isUser ? '50%' : '5px';
+                            var icRaw =
+                                info.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+                            var ic = safeHttpsUrl(icRaw);
+
+                            preview.innerHTML =
+                                '<div class="channel-preview">' +
+                                '<img class="cp-icon" src="" alt="" style="border-radius:' +
+                                radius +
+                                '">' +
+                                '<div class="cp-info">' +
+                                '<div class="cp-name">' +
+                                (isUser ? '@' : '#') +
+                                escapeHtml(String(info.name != null ? info.name : '')) +
+                                '</div><div class="cp-sub">' +
+                                escapeHtml(String(info.guildName != null ? info.guildName : '')) +
+                                '</div></div></div>';
+                            var im = preview.querySelector('.cp-icon');
+                            if (im) im.src = ic;
+                            isChannelValid = true;
+                            btn.disabled = false;
+                        } else {
+                            const err = await res.json();
+                            preview.innerHTML =
+                                '<div style="color:#e74c3c; padding:5px; font-size:0.9rem;">Error: ' +
+                                escapeHtml(String(err.error != null ? err.error : '')) +
+                                '</div>';
+                        }
+                    } catch (e) {
+                        preview.innerHTML = `<div style="color:#e74c3c; padding:5px;">Validation Failed</div>`;
+                    }
+                }, 600);
+            }
+
+            async function loadData() {
+                try {
+                    const res = await fetch('/api/auto-msg');
+                    const list = await res.json();
+                    render(list);
+                } catch (e) {
+                    document.getElementById('list').innerHTML = '<div style="color:#e74c3c; text-align:center;">Failed to load.</div>';
+                }
+            }
+
+            function render(list) {
+                const listObj = document.getElementById('list');
+                listObj.innerHTML = '';
+
+                if (list.length === 0) {
+                    listObj.innerHTML = '<div class="no-items" style="text-align: center; color: #666; font-style: italic;">No active schedules.</div>';
+                    return;
+                }
+
+                list.forEach(function (item) {
+                    listObj.innerHTML +=
+                        '<div class="msg-item">' +
+                        '<div class="msg-info">' +
+                        '<div class="msg-title"><i class="fas fa-hashtag"></i> ' +
+                        escapeHtml(String(item.channelId != null ? item.channelId : '')) +
+                        '</div>' +
+                        '<div class="msg-detail">' +
+                        escapeHtml(String(item.message != null ? item.message : '')) +
+                        '</div>' +
+                        '<div class="msg-meta"><i class="fas fa-clock"></i> Every ' +
+                        escapeHtml(String(item.interval != null ? item.interval : '')) +
+                        ' ' +
+                        escapeHtml(String(item.unit != null ? item.unit : '')) +
+                        '(s)</div></div>' +
+                        '<button type="button" class="btn-delete" onclick="deleteItem(' +
+                        JSON.stringify(String(item.channelId != null ? item.channelId : '')) +
+                        ')"><i class="fas fa-trash"></i></button></div>';
+                });
+            }
+
+            async function addAutoMsg() {
+                const channelId = document.getElementById('channelId').value.trim();
+                const intervalVal = document.getElementById('intervalVal').value;
+                const intervalUnit = document.getElementById('intervalUnit').value;
+                const message = document.getElementById('messageContent').value.trim();
+                const btn = document.getElementById('btnSave');
+
+                if (!channelId || !intervalVal || !message) return showToast('All fields required', 'warn');
+
+                const originalText = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = "Saving...";
+
+                try {
+                    const res = await fetch('/api/auto-msg', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'add', channelId, message, interval: intervalVal, unit: intervalUnit })
+                    });
+
+                    if (res.ok) {
+                        // Success Animation
+                        btn.style.background = '#2ecc71';
+                        btn.innerText = "Schedule Added!";
+
+                        setTimeout(() => {
+                            btn.style.background = ''; // Revert to CSS
+                            btn.innerText = originalText;
+                            btn.disabled = false; // Re-enable (though fields are cleared, validation will disable it again if typed)
+                            validateChannel(); // Re-validate (will likely disable button since field is cleared)
+                        }, 1000);
+
+                        // Reset Fields
+                        document.getElementById('channelId').value = '';
+                        document.getElementById('messageContent').value = '';
+                        document.getElementById('intervalVal').value = '';
+                        document.getElementById('channelPreview').style.display = 'none';
+
+                        loadData();
+                    } else {
+                        const err = await res.json();
+                        showToast('Failed: ' + (err.error || 'Unknown error'), 'error');
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
+                } catch (e) {
+                    showToast('Error processing request', 'error');
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            }
+
+            async function deleteItem(channelId) {
+                if (!confirm('Stop this auto message?')) return;
+                try {
+                    await fetch('/api/auto-msg', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'remove', channelId })
+                    });
+                    loadData();
+                } catch (e) { showToast('An error occurred', 'error'); }
+            }
+
+            window.onload = loadData;
+        </script>
+</body>
+
+</html>

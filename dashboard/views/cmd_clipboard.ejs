@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipboard - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+
+    <a href="/commands" class="module-back">← Back</a>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>Clipboard</h1>
+            <p>Define custom trigger words and their responses.</p>
+        </div>
+
+        <!-- Add New Trigger -->
+        <div class="section-card">
+            <div class="section-title">Add New Pair</div>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label class="input-label">Trigger Word (Allowed User usage)</label>
+                    <input type="text" id="newTrigger" class="input-field" placeholder="e.g. hello">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Response</label>
+                    <textarea id="newResponse" class="input-field"
+                        placeholder="e.g. User says hi! (Multi-line supported)"
+                        style="resize: vertical; min-height: 100px; font-family: inherit;"></textarea>
+                </div>
+            </div>
+            <button class="btn-add" onclick="addPair()">Add to Clipboard</button>
+        </div>
+
+        <!-- Trigger List -->
+        <div class="section-card">
+            <div class="section-title">Active Clipboard Items</div>
+            <div id="list">
+                <div class="no-items">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+
+        </div>
+    </main>
+
+
+        <script>
+            let currentData = {};
+
+            async function loadData() {
+                try {
+                    const res = await fetch('/api/clipboard');
+                    const data = await res.json();
+                    currentData = data.triggers || {};
+                    render();
+                } catch (e) { console.error(e); }
+            }
+
+            function render() {
+                const listObj = document.getElementById('list');
+                listObj.innerHTML = '';
+
+                const items = Object.entries(currentData);
+
+                if (items.length === 0) {
+                    listObj.innerHTML = '<div class="no-items">No clipboard items found.</div>';
+                    return;
+                }
+
+                items.forEach(function ([trigger, response]) {
+                    listObj.innerHTML +=
+                        '<div class="trigger-item">' +
+                        '<div class="trigger-info">' +
+                        '<div class="trigger-name">!' +
+                        escapeHtml(String(trigger)) +
+                        '</div>' +
+                        '<div class="trigger-response">' +
+                        escapeHtml(String(response != null ? response : '')) +
+                        '</div></div>' +
+                        '<button type="button" class="btn-delete" onclick="deletePair(' +
+                        JSON.stringify(trigger) +
+                        ')">' +
+                        '<i class="fas fa-trash"></i></button></div>';
+                });
+            }
+
+            async function addPair() {
+                const trigger = document.getElementById('newTrigger').value.trim();
+                const response = document.getElementById('newResponse').value.trim();
+
+                if (!trigger || !response) return showToast(Please enter both trigger and response.');
+                if (trigger.includes(' ')) return showToast(Trigger word should not contain spaces.');
+
+                try {
+                    await fetch('/api/clipboard', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'add', trigger, response })
+                    });
+
+                    document.getElementById('newTrigger').value = '';
+                    document.getElementById('newResponse').value = '';
+                    await loadData();
+                } catch (e) {
+                    showToast('Error processing request', 'error');
+                }
+            }
+
+            async function deletePair(trigger) {
+                if (!confirm('Delete this item?')) return;
+                try {
+                    await fetch('/api/clipboard', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'remove', trigger })
+                    });
+                    await loadData();
+                } catch (e) {
+                    showToast('Error deleting item', 'error');
+                }
+            }
+
+            window.onload = loadData;
+        </script>
+</body>
+
+</html>

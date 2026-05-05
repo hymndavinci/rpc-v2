@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat System - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+
+    <a href="/commands" class="module-back">← Back</a>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>AI Chat System</h1>
+            <p>Configure your personal AI assistant.</p>
+        </div>
+
+
+
+        <!-- AI Personality Config -->
+        <div class="section-card">
+            <div class="section-title">Personality & Rules</div>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label class="input-label">AI Model</label>
+                    <select id="modelType" class="input-field">
+                        <option value="slow">Slow (Thinking) - Best Quality</option>
+                        <option value="fast">Fast (Instruct) - High Speed</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">AI Name</label>
+                    <input type="text" id="aiName" class="input-field" placeholder="e.g. Hymn">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Backstory</label>
+                    <input type="text" id="backstory" class="input-field"
+                        placeholder="e.g. You are a helpful assistant...">
+                </div>
+                <div class="input-group full-width">
+                    <label class="input-label">Personality</label>
+                    <input type="text" id="personality" class="input-field"
+                        placeholder="e.g. Funny, Sarcastic, Professional">
+                </div>
+                <div class="input-group full-width">
+                    <label class="input-label">System Rules</label>
+                    <textarea id="rules" class="input-field"
+                        placeholder="e.g. Do not ping everyone. Keep answers short."></textarea>
+                </div>
+            </div>
+            <button class="btn-add" id="btnSavePersonality" onclick="savePersonality()">Save Settings</button>
+        </div>
+
+        <!-- Banned Words -->
+        <div class="section-card">
+            <div class="section-title">Banned Words (Safety)</div>
+            <p class="ai-help">AI will ignore messages containing these
+                words/phrases.</p>
+            <div class="input-group">
+                <div class="flex-row-gap">
+                    <input type="text" id="newBannedWord" class="input-field input-field--grow" placeholder="e.g. age">
+                    <button type="button" class="btn-add btn-add--inline" onclick="addBannedWord()">Add</button>
+                </div>
+            </div>
+            <div id="bannedList" class="list-cloud"></div>
+        </div>
+
+        <!-- Whitelists -->
+        <div class="form-grid">
+            <!-- Servers -->
+            <div class="section-card">
+                <div class="section-title">Whitelisted Servers</div>
+                <p class="ai-help">Enable for specific servers.</p>
+
+                <input type="text" id="inputGuild" class="input-field" placeholder="Paste Server ID..."
+                    oninput="onWhitelistInput('guild')">
+                <div id="previewGuild" class="server-preview hidden"></div>
+                <button type="button" id="btnAddGuild" class="btn-add" disabled onclick="confirmAdd('guild')">Add Server</button>
+
+                <div id="serverList" class="list-divider"></div>
+            </div>
+
+            <!-- Channels -->
+            <div class="section-card">
+                <div class="section-title">Whitelisted Channels</div>
+                <p class="ai-help">Enable for specific channels (Ping
+                    required).</p>
+
+                <input type="text" id="inputChannel" class="input-field" placeholder="Paste Channel ID..."
+                    oninput="onWhitelistInput('channel')">
+                <div id="previewChannel" class="server-preview hidden"></div>
+                <button type="button" id="btnAddChannel" class="btn-add" disabled onclick="confirmAdd('channel')">Add Channel</button>
+
+                <div id="channelList" class="list-divider"></div>
+            </div>
+        </div>
+
+        <!-- Advanced: DM & Free Will -->
+        <div class="form-grid">
+            <!-- DM Users -->
+            <div class="section-card">
+                <div class="section-title">AI DM Users</div>
+                <p class="ai-help">AI talks in DMs with these users (No ping
+                    required).</p>
+
+                <input type="text" id="inputUser" class="input-field" placeholder="Paste User ID..."
+                    oninput="onWhitelistInput('user')">
+                <div id="previewUser" class="server-preview hidden"></div>
+                <button type="button" id="btnAddUser" class="btn-add" disabled onclick="confirmAdd('user')">Add User</button>
+
+                <div id="userList" class="list-divider"></div>
+            </div>
+
+            <!-- Group Chats -->
+            <div class="section-card">
+                <div class="section-title">Whitelisted Group Chats</div>
+                <p class="ai-help">Enable for specific Group DMs.</p>
+
+                <input type="text" id="inputGroup" class="input-field" placeholder="Paste Group ID..."
+                    oninput="onWhitelistInput('group')">
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="chkGroupMention">
+                    <label for="chkGroupMention">Reply ONLY when
+                        Mentioned</label>
+                </div>
+
+                <div id="previewGroup" class="server-preview hidden"></div>
+                <button type="button" id="btnAddGroup" class="btn-add" disabled onclick="confirmAdd('group')">Add Group</button>
+
+                <div id="groupList" class="list-divider"></div>
+            </div>
+
+            <!-- Free Will Channels -->
+            <div class="section-card">
+                <div class="section-title">Free Will Channels</div>
+                <p class="ai-help">
+                    AI replies to EVERY message here (No ping required).
+                    <span class="warning-text">⚠ Warning: Can be spammy.</span>
+                </p>
+
+                <div class="flex-row-gap">
+                    <input type="text" id="inputFree" class="input-field input-field--grow" placeholder="Paste Channel ID..."
+                        oninput="onWhitelistInput('free')">
+                    <input type="number" id="inputFreeDelay" class="input-field input-field--w140" placeholder="Delay (seconds)" min="0">
+                </div>
+                <div id="previewFree" class="server-preview hidden"></div>
+                <button type="button" id="btnAddFree" class="btn-add" disabled onclick="confirmAdd('free')">Add Channel</button>
+
+                <div id="freeList" class="list-divider"></div>
+            </div>
+
+            <!-- Blocklist Users -->
+            <div class="section-card section-card--danger">
+                <div class="section-title section-title--danger">Blocklist Users</div>
+                <p class="ai-help">AI will ignore these users completely across all servers and DMs.</p>
+
+                <input type="text" id="inputBlocked" class="input-field" placeholder="Paste User ID..."
+                    oninput="onWhitelistInput('blockuser')">
+                <div id="previewBlocked" class="server-preview hidden"></div>
+                <button type="button" id="btnAddBlocked" class="btn-add btn-add--danger" disabled onclick="confirmAdd('blockuser')">Block User</button>
+
+                <div id="blockedList" class="list-divider"></div>
+            </div>
+        </div>
+
+        <!-- Global Toggle (Danger Zone) -->
+        <div class="section-card section-card--danger">
+            <div class="status-row">
+                <div class="status-info">
+                    <span class="status-danger-title">Global Enable (Danger)</span>
+                    <p class="status-help">
+                        Enables AI response to PINGS/MENTIONS in ALL servers and channels.
+                        <span class="warning-text">⚠ Warning: High risk of spam. Use whitelist instead if unsure.</span>
+                        <span id="globalStatusText"></span>
+                    </p>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="globalToggle" onchange="updateConfig()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="status-row">
+                <div class="status-info">
+                    <span class="status-muted-title">Disable AI Mention/Ping</span>
+                    <p class="status-help">
+                        If enabled, the AI will softly reply to users without constantly pinging/mentioning them.
+                    </p>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="disablePing" onchange="updateConfig()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+    </div>
+
+
+        </div>
+    </main>
+
+
+        <script>
+            let currentData = {};
+            let debounceTimer;
+
+            async function loadData() {
+                try {
+                    const res = await fetch('/api/ai');
+                    currentData = await res.json();
+                    render();
+                } catch (e) { console.error(e); }
+            }
+
+            function render() {
+                // Global
+                const globalOn = currentData.global;
+                document.getElementById('globalToggle').checked = globalOn;
+                document.getElementById('globalStatusText').innerText = globalOn ?
+                    "ON: AI is active." :
+                    "OFF: AI is disabled (except whitelist?). Actually global usually overrides all.";
+                // User requested: Global ON/OFF -> Server -> Channel.
+                // I'll stick to: Global Toggle controls "Master Power".
+                // OR Global Toggle = "Respond to Pings Globally". Default false.
+                // Let's assume Global Toggle means "System Enabled".
+
+                // Ping Toggle
+                document.getElementById('disablePing').checked = currentData.disablePing || false;
+
+                // Personality
+                document.getElementById('modelType').value = currentData.modelType || 'slow';
+                document.getElementById('aiName').value = currentData.aiName || '';
+                document.getElementById('backstory').value = currentData.backstory || '';
+                document.getElementById('personality').value = currentData.personality || '';
+                document.getElementById('rules').value = currentData.rules || '';
+
+                // Banned
+                const bList = document.getElementById('bannedList');
+                bList.innerHTML = '';
+                (currentData.bannedWords || []).forEach(function (w) {
+                    bList.innerHTML +=
+                        '<div style="background:#2a2a35; padding:8px 15px; border-radius:20px; display:flex; align-items:center; gap:10px; border:1px solid rgba(255,255,255,0.1);">' +
+                        '<span>' +
+                        escapeHtml(String(w != null ? w : '')) +
+                        '</span>' +
+                        '<span role="button" tabindex="0" onclick="removeBannedWord(' +
+                        JSON.stringify(String(w != null ? w : '')) +
+                        ')" style="cursor:pointer; color:#e74c3c; font-weight:bold;">&times;</span>' +
+                        '</div>';
+                });
+
+                // Render Lists
+                renderList('serverList', currentData.enrichedServers, 'guild');
+                renderList('channelList', currentData.enrichedChannels, 'channel');
+                renderList('groupList', currentData.enrichedGroups, 'group');
+                renderList('userList', currentData.enrichedUsers, 'user');
+                renderList('freeList', currentData.enrichedFreeWill, 'free');
+                renderList('blockedList', currentData.enrichedBlockedUsers, 'blockuser');
+            }
+
+            function renderList(elementId, items, type) {
+                const el = document.getElementById(elementId);
+                el.innerHTML = '';
+                if (!items || items.length === 0) {
+                    el.innerHTML = '<div class="no-items">None added.</div>';
+                    return;
+                }
+
+                items.forEach(function (item) {
+                    let icon = item.icon || item.guildIcon || item.avatar;
+                    let sub = 'ID: ' + escapeHtml(String(item.id != null ? item.id : ''));
+                    let name = item.name || item.username;
+
+                    if (type === 'channel' || type === 'free') {
+                        name = '#' + (name != null ? name : '');
+                        sub =
+                            'in ' +
+                            escapeHtml(String(item.guildName != null ? item.guildName : ''));
+                        if (type === 'free' && item.delay > 0) {
+                            sub +=
+                                ' <span style="background:#8a2be2; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.7em;">' +
+                                escapeHtml(String(item.delay)) +
+                                's DELAY</span>';
+                        }
+                    }
+                    if (type === 'group') {
+                        sub = 'Group Chat';
+                        if (item.mode === 'mention')
+                            sub +=
+                                ' <span style="background:#e67e22; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.7em;">MENTION ONLY</span>';
+                        else
+                            sub +=
+                                ' <span style="background:#2ecc71; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.7em;">ALWAYS</span>';
+                        if (!icon) icon = 'https://cdn.discordapp.com/embed/avatars/0.png';
+                    }
+
+                    var iconUrl =
+                        typeof safeHttpsUrl === 'function'
+                            ? safeHttpsUrl(icon)
+                            : icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+                    el.innerHTML +=
+                        '<div class="whitelist-item">' +
+                        '<img class="whitelist-icon wi-ico" src="" alt="">' +
+                        '<div class="whitelist-info">' +
+                        '<div class="whitelist-name">' +
+                        escapeHtml(String(name != null ? name : '')) +
+                        '</div><div class="whitelist-sub">' +
+                        sub +
+                        '</div></div>' +
+                        '<button type="button" class="btn-delete" style="padding:5px 10px;" onclick="removeList(' +
+                        JSON.stringify(type) +
+                        ', ' +
+                        JSON.stringify(String(item.id != null ? item.id : '')) +
+                        ')"><i class="fas fa-times"></i></button></div>';
+                    var last = el.querySelector('.whitelist-item:last-child .wi-ico');
+                    if (last) last.src = iconUrl;
+                });
+            }
+
+            function onWhitelistInput(type) {
+                clearTimeout(debounceTimer);
+                let inputId = 'inputGuild';
+                let previewId = 'previewGuild';
+                let btnId = 'btnAddGuild';
+
+                if (type === 'channel') { inputId = 'inputChannel'; previewId = 'previewChannel'; btnId = 'btnAddChannel'; }
+                if (type === 'user') { inputId = 'inputUser'; previewId = 'previewUser'; btnId = 'btnAddUser'; }
+                if (type === 'group') { inputId = 'inputGroup'; previewId = 'previewGroup'; btnId = 'btnAddGroup'; }
+                if (type === 'free') { inputId = 'inputFree'; previewId = 'previewFree'; btnId = 'btnAddFree'; }
+                if (type === 'blockuser') { inputId = 'inputBlocked'; previewId = 'previewBlocked'; btnId = 'btnAddBlocked'; }
+
+                const id = document.getElementById(inputId).value.trim();
+                const previewEl = document.getElementById(previewId);
+                const btnEl = document.getElementById(btnId);
+
+                if (id.length < 17) {
+                    previewEl.style.display = 'none';
+                    btnEl.disabled = true;
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    previewEl.style.display = 'block';
+                    previewEl.innerHTML = '<div style="color:#999;">Verifying...</div>';
+                    let apiEndpoint = `/api/validate/${type}`;
+                    if (type === 'free' || type === 'group') apiEndpoint = `/api/validate/channel`; // Reuse channel validation
+                    if (type === 'blockuser') apiEndpoint = `/api/validate/user`;
+
+                    try {
+                        const res = await fetch(apiEndpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id })
+                        });
+
+                        if (res.ok) {
+                            const info = await res.json();
+                            let iconUrl =
+                                typeof safeHttpsUrl === 'function'
+                                    ? safeHttpsUrl(
+                                          info.icon ||
+                                              info.guildIcon ||
+                                              info.avatar ||
+                                              'https://cdn.discordapp.com/embed/avatars/0.png'
+                                      )
+                                    : info.icon ||
+                                      info.guildIcon ||
+                                      info.avatar ||
+                                      'https://cdn.discordapp.com/embed/avatars/0.png';
+                            let subInfo = 'ID: ' + escapeHtml(String(info.id != null ? info.id : ''));
+                            let name = info.name || info.username;
+
+                            if (type === 'channel' || type === 'free')
+                                subInfo =
+                                    'In: ' +
+                                    escapeHtml(String(info.guildName != null ? info.guildName : ''));
+                            if (type === 'group') subInfo = 'Group Chat Found';
+                            if (type === 'guild') subInfo = 'Server Found';
+
+                            previewEl.innerHTML =
+                                '<div class="server-preview">' +
+                                '<img class="sp-icon" src="" alt="">' +
+                                '<div class="sp-info">' +
+                                '<div class="sp-name">' +
+                                escapeHtml(String(name != null ? name : '')) +
+                                '</div><div class="sp-sub">' +
+                                subInfo +
+                                '</div></div></div>';
+                            var spi = previewEl.querySelector('.sp-icon');
+                            if (spi) spi.src = iconUrl;
+                            btnEl.disabled = false;
+                        } else {
+                            previewEl.innerHTML = '<div style="color:#ff5555; padding:10px;">Invalid ID.</div>';
+                            btnEl.disabled = true;
+                        }
+                    } catch (e) {
+                        previewEl.innerHTML = '<div style="color:#ff5555; padding:10px;">Error.</div>';
+                        btnEl.disabled = true;
+                    }
+                }, 800);
+            }
+
+            async function confirmAdd(type) {
+                let inputId = 'inputGuild';
+                let previewId = 'previewGuild';
+                let btnId = 'btnAddGuild';
+
+                if (type === 'channel') { inputId = 'inputChannel'; previewId = 'previewChannel'; btnId = 'btnAddChannel'; }
+                if (type === 'user') { inputId = 'inputUser'; previewId = 'previewUser'; btnId = 'btnAddUser'; }
+                if (type === 'group') { inputId = 'inputGroup'; previewId = 'previewGroup'; btnId = 'btnAddGroup'; }
+                if (type === 'free') { inputId = 'inputFree'; previewId = 'previewFree'; btnId = 'btnAddFree'; }
+                if (type === 'blockuser') { inputId = 'inputBlocked'; previewId = 'previewBlocked'; btnId = 'btnAddBlocked'; }
+
+                // Map type to data key
+                const val = document.getElementById(inputId).value.trim();
+
+                if (type === 'guild') {
+                    if (!currentData.enabledServers) currentData.enabledServers = [];
+                    addId(currentData.enabledServers, val);
+                }
+                if (type === 'channel') {
+                    if (!currentData.enabledChannels) currentData.enabledChannels = [];
+                    addId(currentData.enabledChannels, val);
+                }
+                if (type === 'user') {
+                    if (!currentData.dmUsers) currentData.dmUsers = [];
+                    addId(currentData.dmUsers, val);
+                }
+                if (type === 'blockuser') {
+                    if (!currentData.blockedUsers) currentData.blockedUsers = [];
+                    addId(currentData.blockedUsers, val);
+                }
+                if (type === 'group') {
+                    const isMentionOnly = document.getElementById('chkGroupMention').checked;
+                    if (!currentData.enabledGroups) currentData.enabledGroups = [];
+                    if (!currentData.enabledGroupsMention) currentData.enabledGroupsMention = [];
+
+                    if (isMentionOnly) {
+                        // Add to mention, remove from always if exists
+                        addId(currentData.enabledGroupsMention, val);
+                        currentData.enabledGroups = currentData.enabledGroups.filter(x => x !== val);
+                    } else {
+                        // Add to always, remove from mention if exists
+                        addId(currentData.enabledGroups, val);
+                        currentData.enabledGroupsMention = currentData.enabledGroupsMention.filter(x => x !== val);
+                    }
+                    // Clear checkbox
+                    document.getElementById('chkGroupMention').checked = false;
+                }
+                if (type === 'free') {
+                        let delayVal = parseInt(document.getElementById('inputFreeDelay').value) || 0;
+                        if (!currentData.freeWillChannels) currentData.freeWillChannels = [];
+
+                        // Check if already exists and update or add new
+                        const existingIndex = currentData.freeWillChannels.findIndex(x => typeof x === 'object' ? x.id === val : x === val);
+                        if (existingIndex >= 0) {
+                            currentData.freeWillChannels[existingIndex] = { id: val, delay: delayVal };
+                        } else {
+                            currentData.freeWillChannels.push({ id: val, delay: delayVal });
+                        }
+                    }
+
+                await saveData();
+                await loadData();
+
+                // Reset UI
+                document.getElementById(inputId).value = '';
+                if (type === 'free') document.getElementById('inputFreeDelay').value = '';
+                document.getElementById(previewId).style.display = 'none';
+                document.getElementById(previewId).innerHTML = '';
+                document.getElementById(btnId).disabled = true;
+            }
+
+            function addId(arr, id) {
+                if (id && !arr.includes(id)) arr.push(id);
+            }
+
+            async function removeList(type, id) {
+                if (!confirm('Remove?')) return;
+                if (type === 'guild') currentData.enabledServers = currentData.enabledServers.filter(x => x !== id);
+                if (type === 'channel') currentData.enabledChannels = currentData.enabledChannels.filter(x => x !== id);
+                if (type === 'user') currentData.dmUsers = currentData.dmUsers.filter(x => x !== id);
+                if (type === 'blockuser') currentData.blockedUsers = currentData.blockedUsers.filter(x => x !== id);
+                if (type === 'group') {
+                    if (currentData.enabledGroups) currentData.enabledGroups = currentData.enabledGroups.filter(x => x !== id);
+                    if (currentData.enabledGroupsMention) currentData.enabledGroupsMention = currentData.enabledGroupsMention.filter(x => x !== id);
+                }
+                if (type === 'free') currentData.freeWillChannels = currentData.freeWillChannels.filter(x => typeof x === 'object' ? x.id !== id : x !== id);
+                await saveData();
+                await loadData();
+            }
+
+            async function addBannedWord() {
+                const w = document.getElementById('newBannedWord').value.trim();
+                if (!w) return;
+                if (!currentData.bannedWords) currentData.bannedWords = [];
+                if (!currentData.bannedWords.includes(w)) currentData.bannedWords.push(w);
+                await saveData();
+                document.getElementById('newBannedWord').value = '';
+                render();
+            }
+            async function removeBannedWord(w) {
+                if (!currentData.bannedWords) return;
+                currentData.bannedWords = currentData.bannedWords.filter(x => x !== w);
+                await saveData();
+                render();
+            }
+
+            async function savePersonality() {
+                const btn = document.getElementById('btnSavePersonality');
+                const originalText = btn.innerText;
+                btn.innerText = "Saved!";
+                btn.style.background = "#2ecc71";
+                btn.disabled = true;
+
+                currentData.modelType = document.getElementById('modelType').value;
+                currentData.aiName = document.getElementById('aiName').value;
+                currentData.backstory = document.getElementById('backstory').value;
+                currentData.personality = document.getElementById('personality').value;
+                currentData.rules = document.getElementById('rules').value;
+
+                await saveData();
+
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = ""; // Reset
+                    btn.disabled = false;
+                }, 2000);
+            }
+
+            async function updateConfig() {
+                currentData.global = document.getElementById('globalToggle').checked;
+                currentData.disablePing = document.getElementById('disablePing').checked;
+                await saveData();
+                render(); // No fetch needed usually but consistent
+            }
+
+            async function saveData() {
+                // Send cleaner payload
+                const payload = {
+                    global: currentData.global,
+                    enabledServers: currentData.enabledServers,
+                    enabledChannels: currentData.enabledChannels,
+                    dmUsers: currentData.dmUsers,
+                    enabledGroups: currentData.enabledGroups,
+                    enabledGroupsMention: currentData.enabledGroupsMention,
+                    freeWillChannels: currentData.freeWillChannels,
+                    aiName: currentData.aiName,
+                    backstory: currentData.backstory,
+                    personality: currentData.personality,
+                    rules: currentData.rules,
+                    modelType: currentData.modelType,
+                    bannedWords: currentData.bannedWords,
+                    disablePing: currentData.disablePing,
+                    blockedUsers: currentData.blockedUsers
+                };
+
+                try {
+                    await fetch('/api/ai', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (e) { console.error('Error saving:', e); }
+            }
+
+            window.onload = loadData;
+        </script>
+</body>
+
+</html>

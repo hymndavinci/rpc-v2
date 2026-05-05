@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hymn+ Server Cloner</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+            <header class="page-header">
+                <div>
+                    <p class="page-header__eyebrow">Tools</p>
+                    <h1 class="page-header__title">Server Cloner</h1>
+                    <p class="page-header__hint">Replicate server structures instantly.</p>
+                </div>
+            </header>
+
+    <div class="cloner-container">
+
+        <!-- Configuration -->
+        <div class="section-card" id="configSection">
+            <div class="server-input-group">
+                <div class="input-wrapper">
+                    <label class="input-label">Source Server ID</label>
+                    <input type="text" id="sourceId" class="server-input" placeholder="Enter Source Guild ID"
+                        onblur="fetchGuild('source')">
+                    <div id="sourcePreview" class="server-preview hidden"></div>
+                </div>
+                <div class="input-wrapper">
+                    <label class="input-label">Target Server ID</label>
+                    <input type="text" id="targetId" class="server-input" placeholder="Enter Target Guild ID"
+                        onblur="fetchGuild('target')">
+                    <div id="targetPreview" class="server-preview hidden"></div>
+
+                </div>
+            </div>
+
+            <div class="options-title">Cloning Configuration</div>
+            <div class="options-grid">
+                <div class="option-item">
+                    <span class="option-label">Delete Existing Channels</span>
+                    <label class="switch"><input type="checkbox" id="delChannels" checked><span
+                            class="slider"></span></label>
+                </div>
+                <div class="option-item">
+                    <span class="option-label">Delete Existing Roles</span>
+                    <label class="switch"><input type="checkbox" id="delRoles" checked><span
+                            class="slider"></span></label>
+                </div>
+                <div class="option-item">
+                    <span class="option-label">Delete Emojis</span>
+                    <label class="switch"><input type="checkbox" id="delEmojis" checked><span
+                            class="slider"></span></label>
+                </div>
+                <div class="option-item">
+                    <span class="option-label">Clone Channels</span>
+                    <label class="switch"><input type="checkbox" id="cloneChannels" checked><span
+                            class="slider"></span></label>
+                </div>
+                <div class="option-item">
+                    <span class="option-label">Clone Roles</span>
+                    <label class="switch"><input type="checkbox" id="cloneRoles" checked><span
+                            class="slider"></span></label>
+                </div>
+                <div class="option-item option-item--full option-item--stack">
+                    <div class="option-item__row">
+                        <span class="option-label">Clone Emojis</span>
+                        <label class="switch">
+                            <input type="checkbox" id="cloneEmojis" onchange="toggleEmojiWarning(this)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div id="emojiWarning" class="cloner-warn">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <b>Warning:</b> Enabling this will significantly slow down the process (10s delay per emoji) to
+                        prevent rate limits.
+                    </div>
+                </div>
+                <div class="option-item option-item--full">
+                    <span class="option-label">Update Server Name &amp; Icon</span>
+                    <label class="switch"><input type="checkbox" id="updateInfo"><span class="slider"></span></label>
+                </div>
+            </div>
+
+            <div class="action-area">
+                <button class="btn-clone" id="startBtn" onclick="startCloning()">Start Cloning</button>
+                <button class="btn-clone btn-clone--danger hidden" id="stopBtn" onclick="stopCloning()">Force Stop</button>
+            </div>
+        </div>
+
+        <!-- Console -->
+        <div class="section-card">
+            <h3 class="cloner-live-title">Live Progress</h3>
+            <div class="console-box" id="consoleBox">
+                <div class="log-line log-line--muted">Waiting for process to start...</div>
+            </div>
+        </div>
+    </div>
+
+        </div>
+    </main>
+
+        <script>
+            let isCloning = false;
+            let validSource = false;
+            let validTarget = false;
+
+            async function fetchGuild(type) {
+                const id = document.getElementById(type + 'Id').value;
+                const preview = document.getElementById(type + 'Preview');
+                if (!id || id.length < 17) {
+                    preview.style.display = 'none';
+                    if (type === 'source') validSource = false; else validTarget = false;
+                    return;
+                }
+
+                preview.innerHTML = '<span style="color:#aaa;">Fetching...</span>';
+                preview.style.display = 'flex';
+                preview.className = 'server-preview';
+
+                try {
+                    const res = await fetch('/api/cloner/fetch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ guildId: id })
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        let permHtml = '';
+                        if (type === 'target') {
+                            if (data.isAdmin || data.isOwner) permHtml = '<div class="perm-tag perm-ok">✓ Permission Granted</div>';
+                            else permHtml = '<div class="perm-tag perm-bad">✕ Missing Admin/Owner</div>';
+
+                            if (data.isAdmin || data.isOwner) validTarget = true; else validTarget = false;
+                        } else {
+                            validSource = true;
+                        }
+
+                        preview.className = 'server-preview valid';
+                        var ic = safeHttpsUrl(
+                            data.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'
+                        );
+                        preview.innerHTML =
+                            '<img class="preview-icon wf-cl" src="" alt="">' +
+                            '<div class="preview-info">' +
+                            '<h3>' +
+                            escapeHtml(String(data.name != null ? data.name : '')) +
+                            '</h3>' +
+                            permHtml +
+                            '</div>';
+                        var wim = preview.querySelector('.wf-cl');
+                        if (wim) wim.src = ic;
+                    } else {
+                        if (type === 'source') validSource = false; else validTarget = false;
+                        preview.className = 'server-preview invalid';
+                        preview.innerHTML =
+                            '<span style="color:#ff4757; font-size:0.9rem;">' +
+                            escapeHtml(String(data.message != null ? data.message : '')) +
+                            '</span>';
+                    }
+                } catch (e) { console.error(e); }
+                checkBtn();
+            }
+
+            function checkBtn() {
+                const btn = document.getElementById('startBtn');
+                if (isCloning) { btn.disabled = true; return; }
+                if (validSource && validTarget) btn.disabled = false;
+                else btn.disabled = true;
+            }
+
+            async function startCloning() {
+                if (!validSource || !validTarget) return showToast('Please validate Server IDs first.', 'warn');
+                if (!confirm('WARNING: This will modify the target server irreversibly! Proceed?')) return;
+
+                const options = {
+                    deleteChannels: document.getElementById('delChannels').checked,
+                    deleteRoles: document.getElementById('delRoles').checked,
+                    deleteEmojis: document.getElementById('delEmojis').checked,
+                    cloneChannels: document.getElementById('cloneChannels').checked,
+                    cloneRoles: document.getElementById('cloneRoles').checked,
+                    cloneEmojis: document.getElementById('cloneEmojis').checked,
+                    updateInfo: document.getElementById('updateInfo').checked
+                };
+
+                const sourceId = document.getElementById('sourceId').value;
+                const targetId = document.getElementById('targetId').value;
+
+                document.getElementById('startBtn').innerText = "Initializing...";
+                document.getElementById('startBtn').disabled = true;
+
+                try {
+                    const res = await fetch('/api/cloner/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sourceId, targetId, options })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        pollStatus();
+                    } else {
+                        showToast('Error: ' + data.message, 'error');
+                        document.getElementById('startBtn').innerText = "Start Cloning";
+                        checkBtn();
+                    }
+                } catch (e) { showToast(e.message, "error"); }
+            }
+
+            let logsSeen = 0;
+
+            function toggleEmojiWarning(el) {
+                const warning = document.getElementById('emojiWarning');
+                if (el.checked) {
+                    warning.style.display = 'block';
+                    // Small animation
+                    warning.style.opacity = '0';
+                    warning.style.transform = 'translateY(-5px)';
+                    setTimeout(() => {
+                        warning.style.transition = 'all 0.3s ease';
+                        warning.style.opacity = '1';
+                        warning.style.transform = 'translateY(0)';
+                    }, 10);
+                } else {
+                    warning.style.display = 'none';
+                }
+            }
+
+            async function stopCloning() {
+                if (!confirm('Are you sure you want to force stop the process?')) return;
+                try {
+                    const res = await fetch('/api/cloner/stop', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast('Stop signal sent.', 'success');
+                        // pollStatus will handle UI reset eventually
+                    } else {
+                        showToast(data.message);
+                    }
+                } catch (e) { showToast(e.message, "error"); }
+            }
+
+            async function pollStatus() {
+                try {
+                    const res = await fetch('/api/cloner/status');
+                    const data = await res.json();
+
+                    isCloning = data.isRunning;
+                    const consoleBox = document.getElementById('consoleBox');
+
+                    if (data.logs.length > logsSeen) {
+                        const newLogs = data.logs.slice(logsSeen);
+                        newLogs.forEach(l => {
+                            const div = document.createElement('div');
+                            div.className = 'log-line';
+                            div.innerText = l;
+                            consoleBox.appendChild(div);
+                        });
+                        logsSeen = data.logs.length;
+                        consoleBox.scrollTop = consoleBox.scrollHeight;
+                    } else if (data.logs.length < logsSeen) {
+                        // Logs Reset
+                        logsSeen = 0;
+                        consoleBox.innerHTML = '';
+                    }
+
+                    if (isCloning) {
+                        document.getElementById('startBtn').style.display = 'none';
+                        document.getElementById('stopBtn').style.display = 'block';
+                        setTimeout(pollStatus, 2000);
+                    } else {
+                        document.getElementById('startBtn').style.display = 'block';
+                        document.getElementById('startBtn').innerText = "Start Cloning";
+                        document.getElementById('stopBtn').style.display = 'none';
+                        checkBtn();
+                    }
+                } catch (e) { setTimeout(pollStatus, 5000); }
+            }
+
+            pollStatus();
+
+        </script>
+</body>
+
+</html>

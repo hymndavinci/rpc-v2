@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="page-login">
+
+    <div class="login-card">
+        <div class="header">
+            <h1>Welcome Back</h1>
+            <p>Please login to access the dashboard</p>
+        </div>
+
+        <div id="errorBox" class="error-msg"></div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="input-group">
+                <label class="label">Username</label>
+                <input type="text" id="username" class="input-field" placeholder="Dashboard Username" required>
+            </div>
+            <div class="input-group">
+                <label class="label">Password</label>
+                <input type="password" id="password" class="input-field" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" id="btnLogin" class="btn-login">
+                <span id="btnText">Login</span>
+                <div id="spinner" class="loading-spinner"></div>
+            </button>
+        </form>
+
+
+    </div>
+
+    <script>
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnLogin');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+            const errorBox = document.getElementById('errorBox');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            errorBox.style.display = 'none';
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            spinner.style.display = 'block';
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (res.redirected) {
+                    window.location.href = res.url;
+                    return;
+                }
+
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = '/'; // Redirect to home
+                } else {
+                    errorBox.innerText = data.error || 'Login failed';
+                    errorBox.style.display = 'block';
+                    btn.disabled = false;
+                    btnText.style.display = 'block';
+                    spinner.style.display = 'none';
+                }
+            } catch (err) {
+                errorBox.innerText = 'Connection error';
+                errorBox.style.display = 'block';
+                btn.disabled = false;
+                btnText.style.display = 'block';
+                spinner.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+
+</html>

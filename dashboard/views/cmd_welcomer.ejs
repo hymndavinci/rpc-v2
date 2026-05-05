@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcomer Setup - Hymn+</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="app-shell page-loaded">
+
+    <%- include('partials/super_button') %>
+
+    <main class="main">
+        <div class="main__inner">
+
+    <a href="/commands" class="module-back">← Back</a>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>Welcomer</h1>
+            <p>Setup beautiful live welcome images for your servers.</p>
+        </div>
+
+        <div class="form-grid">
+            <!-- Setup Form & Preview -->
+            <div class="section-card">
+                <div class="section-title">Welcome Preview Options</div>
+
+                <div class="input-group full-width" style="margin-bottom: 25px;">
+                    <label class="input-label">Welcome Type</label>
+                    <select id="welcomeType" class="input-field" onchange="toggleWelcomeType()">
+                        <option value="card">Card Welcome (Image)</option>
+                        <option value="text">Text Welcome</option>
+                    </select>
+                </div>
+
+                <!-- CARD SETUP -->
+                <div id="cardSetupSection" class="form-grid">
+                    <div class="input-group full-width">
+                        <label class="input-label">Image Card Text</label>
+                        <textarea id="cardMessage" class="input-field"
+                            style="min-height: 80px; resize: vertical; padding: 12px; font-family: inherit;">WELCOME TO {server}&#10;{user}&#10;Member #{count}</textarea>
+                        <p style="color:#aaa; font-size: 0.85rem; margin-top: 10px;">
+                            <b>Placeholders:</b> {user}, {server}, {count}. Use new lines to create new line in card
+                        </p>
+                    </div>
+
+                    <div class="input-group full-width">
+                        <label class="input-label">Username Font Color</label>
+                        <select id="wTextColor" class="input-field"
+                            onchange="localStorage.setItem('welcomerTextColor', this.value)">
+                            <option value="white">White</option>
+                            <option value="black">Black</option>
+                            <option value="red">Red</option>
+                            <option value="purple">Purple</option>
+                            <option value="yellow">Yellow</option>
+                            <option value="orange">Orange</option>
+                            <option value="green">Green</option>
+                            <option value="blue">Blue</option>
+                        </select>
+                        <p
+                            style="color:#aaa; font-size: 0.85rem; margin-top: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border-left: 3px solid #a29bfe;">
+                            <i class="fas fa-image" style="color:#a29bfe; margin-right:5px;"></i>
+                            <b>Pro Tip:</b> you can put your custom background image in data folder and rename it to
+                            welcome.jpg<br><br>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- TEXT SETUP -->
+                <div id="textSetupSection" class="form-grid" style="display: none;">
+                    <div class="input-group full-width">
+                        <label class="input-label">Custom Text Message</label>
+                        <textarea id="textMessage" class="input-field"
+                            style="min-height: 100px; resize: vertical; padding: 12px; font-family: inherit;">hey {user} welcome to the {server} you are {count} member</textarea>
+                        <p style="color:#aaa; font-size: 0.85rem; margin-top: 10px;">
+                            <b>Placeholders:</b> {user} (pings the user), {server} (server name), {count} (member count)
+                        </p>
+                    </div>
+                </div>
+
+                <button id="btnSaveConfig" onclick="saveGlobalConfig()"
+                    style="width: 100%; padding: 15px; font-size: 1.1rem; font-weight: 700; background: linear-gradient(90deg, #8a2be2, #6c5ce7); border: none; border-radius: 12px; color: #fff; cursor: pointer; transition: 0.3s; margin-top: 15px; box-shadow: 0 5px 20px rgba(138, 43, 226, 0.3);">
+                    Save Changes
+                </button>
+            </div>
+
+            <!-- Whitelisted Channels / Add Logic -->
+            <div class="section-card">
+                <div class="section-title">Whitelisted Channels</div>
+                <p style="color:#888; font-size:0.85rem; margin-bottom:15px;">Paste a specific Channel ID to enable
+                    welcoming. (Limited to 1 per server)</p>
+
+                <input type="text" id="inputChannel" class="input-field" placeholder="Paste Channel ID..."
+                    oninput="onWhitelistInput()">
+                <div id="previewChannel" style="display:none;"></div>
+                <button id="btnAddChannel" class="btn-add" disabled onclick="confirmAdd()">Enable in this
+                    Channel</button>
+
+                <div id="channelList"
+                    style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                    <div class="no-items">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+        </div>
+    </main>
+
+
+        <script>
+            let currentSetups = [];
+            let debounceTimer;
+            let verifiedGuildId = null;
+
+            async function loadData() {
+                try {
+                    const res = await fetch('/api/welcomer');
+                    const data = await res.json();
+                    currentSetups = data.setups || [];
+
+                    if (data.config) {
+                        document.getElementById('wTextColor').value = data.config.textcolor || 'white';
+                        document.getElementById('welcomeType').value = data.config.welcomeType || 'card';
+                        document.getElementById('textMessage').value = data.config.textMessage || 'hey {user} welcome to the {server} you are {count} member';
+                        document.getElementById('cardMessage').value = data.config.cardMessage || 'WELCOME TO {server}\n{user}\nMember #{count}';
+                        toggleWelcomeType();
+                    }
+
+                    render();
+                } catch (e) { console.error(e); }
+            }
+
+            function toggleWelcomeType() {
+                const type = document.getElementById('welcomeType').value;
+                if (type === 'text') {
+                    document.getElementById('cardSetupSection').style.display = 'none';
+                    document.getElementById('textSetupSection').style.display = 'grid';
+                } else {
+                    document.getElementById('cardSetupSection').style.display = 'grid';
+                    document.getElementById('textSetupSection').style.display = 'none';
+                }
+            }
+
+            function render() {
+                const listEl = document.getElementById('channelList');
+                listEl.innerHTML = '';
+
+                if (currentSetups.length === 0) {
+                    listEl.innerHTML = '<div class="no-items" style="text-align:center; color:#666;">No channels whitelisted yet.</div>';
+                } else {
+                    currentSetups.forEach(function (s) {
+                        listEl.innerHTML +=
+                            '<div class="whitelist-item">' +
+                            '<img class="whitelist-icon ww-ico" src="" alt="">' +
+                            '<div class="whitelist-info">' +
+                            '<div class="whitelist-name">#' +
+                            escapeHtml(String(s.channelName != null ? s.channelName : '')) +
+                            '</div><div class="whitelist-sub">' +
+                            escapeHtml(String(s.guildName != null ? s.guildName : '')) +
+                            ' | Type: ' +
+                            (s.welcomeType === 'text' ? 'TEXT' : 'CARD') +
+                            '</div></div>' +
+                            '<button type="button" class="btn-delete" style="padding:5px 10px;" onclick="removeSetup(' +
+                            JSON.stringify(String(s.guildId != null ? s.guildId : '')) +
+                            ')"><i class="fas fa-trash"></i></button></div>';
+                        var ic = safeHttpsUrl(s.icon);
+                        var ww = listEl.querySelector('.whitelist-item:last-child .ww-ico');
+                        if (ww) ww.src = ic;
+                    });
+                }
+            }
+
+            function onWhitelistInput() {
+                clearTimeout(debounceTimer);
+                const id = document.getElementById('inputChannel').value.trim();
+                const previewEl = document.getElementById('previewChannel');
+                const btnEl = document.getElementById('btnAddChannel');
+                verifiedGuildId = null;
+
+                if (id.length < 17) {
+                    previewEl.style.display = 'none';
+                    btnEl.disabled = true;
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    previewEl.style.display = 'block';
+                    previewEl.className = 'server-preview';
+                    previewEl.innerHTML = '<div style="color:#999;">Verifying...</div>';
+
+                    try {
+                        const res = await fetch('/api/validate/channel', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id })
+                        });
+
+                        if (res.ok) {
+                            const info = await res.json();
+                            let iconUrl = info.guildIcon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+                            // Check if guild already has setup
+                            if (currentSetups.find(x => x.guildId === info.guildId)) {
+                                previewEl.innerHTML =
+                                    '<div style="color:#ffb8ba;"><b>Already in list!</b><br>' +
+                                    '<span style="font-size:0.8rem">Server "' +
+                                    escapeHtml(String(info.guildName != null ? info.guildName : '')) +
+                                    '" already has a welcome setup. Remove it first to add a new one.</span></div>';
+                                btnEl.disabled = true;
+                                return;
+                            }
+
+                            verifiedGuildId = info.guildId;
+                            iconUrl = safeHttpsUrl(iconUrl);
+                            previewEl.innerHTML =
+                                '<img class="sp-icon ww-ico" src="" alt="">' +
+                                '<div class="sp-info">' +
+                                '<div class="sp-name">#' +
+                                escapeHtml(String(info.name != null ? info.name : '')) +
+                                '</div>' +
+                                '<div class="sp-sub">In server: ' +
+                                escapeHtml(String(info.guildName != null ? info.guildName : '')) +
+                                '</div></div>';
+                            var wi = previewEl.querySelector('.ww-ico');
+                            if (wi) wi.src = iconUrl;
+                            btnEl.disabled = false;
+                        } else {
+                            previewEl.innerHTML = '<div style="color:#ff5555;">Invalid ID or Bot not in server.</div>';
+                            btnEl.disabled = true;
+                        }
+                    } catch (e) {
+                        previewEl.innerHTML = '<div style="color:#ff5555;">Error checking ID.</div>';
+                        btnEl.disabled = true;
+                    }
+                }, 800);
+            }
+
+            async function confirmAdd() {
+                const channelId = document.getElementById('inputChannel').value.trim();
+                if (!channelId || !verifiedGuildId) return;
+
+                const textcolor = document.getElementById('wTextColor').value;
+                const welcomeType = document.getElementById('welcomeType').value;
+                const textMessage = document.getElementById('textMessage').value;
+                const cardMessage = document.getElementById('cardMessage').value;
+
+                try {
+                    await fetch('/api/welcomer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'add', guildId: verifiedGuildId, channelId, template: 'custom', background: 'custom', textcolor, welcomeType, textMessage, cardMessage
+                        })
+                    });
+
+                    document.getElementById('inputChannel').value = '';
+                    document.getElementById('previewChannel').style.display = 'none';
+                    document.getElementById('btnAddChannel').disabled = true;
+                    verifiedGuildId = null;
+
+                    await loadData();
+                } catch (e) { console.error('Error saving', e); }
+            }
+
+            async function saveGlobalConfig() {
+                const textcolor = document.getElementById('wTextColor').value;
+                const welcomeType = document.getElementById('welcomeType').value;
+                const textMessage = document.getElementById('textMessage').value;
+                const cardMessage = document.getElementById('cardMessage').value;
+                const btn = document.getElementById('btnSaveConfig');
+
+                const origText = btn.innerText;
+                const origBg = btn.style.background;
+                btn.innerText = "Saving...";
+                btn.disabled = true;
+
+                try {
+                    await fetch('/api/welcomer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'saveConfig', textcolor, welcomeType, textMessage, cardMessage
+                        })
+                    });
+                    await loadData();
+                    btn.innerText = "Saved!";
+                    btn.style.background = "linear-gradient(90deg, #2ecc71, #27ae60)";
+                } catch (e) {
+                    console.error('Error saving config', e);
+                    btn.innerText = "Error!";
+                }
+
+                setTimeout(() => {
+                    btn.innerText = origText;
+                    btn.disabled = false;
+                    btn.style.background = origBg;
+                }, 2000);
+            }
+
+            async function removeSetup(guildId) {
+                if (!confirm('Remove welcome configuration for this server?')) return;
+                try {
+                    await fetch('/api/welcomer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'remove', guildId })
+                    });
+                    await loadData();
+                } catch (e) { console.error('Error removing', e); }
+            }
+
+            window.onload = () => {
+                loadData();
+            };
+        </script>
+</body>
+
+</html>
